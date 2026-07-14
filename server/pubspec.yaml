@@ -1,0 +1,19 @@
+name: nexus_server
+description: NEXUS compound server - WebSocket state sync (8765), REST (8766), protocol bridges, and the insights engine. Runs on the Mac Studio M4 Max home server (Section 8).
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  nexus_shared:
+    path: ../shared
+  shelf: ^1.4.2
+  shelf_router: ^1.1.4
+  shelf_web_socket: ^3.0.0
+  web_socket_channel: ^3.0.1
+
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.25.0
