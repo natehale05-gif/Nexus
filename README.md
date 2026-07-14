@@ -70,14 +70,45 @@ tag parsing so the model can execute commands. If it isn't reachable (the
 expected case without a Mac Studio nearby), it falls back to a small
 rule-based responder over the same live compound context and says so.
 
-## App -> server wiring
+## App -> server live mode
 
-The app currently runs entirely off `CompoundStore` (local demo state).
-Wiring it to the server's WebSocket instead is a drop-in swap: connect to
-`ws://<server-host>:8765`, replace the local `_tick()`/mutation methods with
-`command` messages, and replace the local `computeInsights` call with
-whatever `state` messages push down - the wire format is `Compound.toJson()`
-either way, so no UI code needs to change.
+The app defaults to local-demo-mode (`CompoundStore`), but it can also run
+live against a real `nexus_server` instance via `ServerClient` - both
+implement the same `NexusDataSource` interface, so no screen code cares
+which one is active.
+
+To use live mode on web, append `?server=<host>:8765` to the app's URL,
+e.g. `http://localhost:PORT/?server=localhost:8765` for `flutter run -d
+chrome`, or `https://your-pages-url/?server=192.168.1.50:8765` for a
+built/deployed copy talking to a server on your LAN or over Tailscale.
+
+`ServerClient` mirrors whatever the server pushes over WebSocket and sends
+every mutation back as a `command` message instead of applying it
+locally - the server is the single source of truth. This has been
+verified end-to-end: server-side REST mutations show up in the app
+instantly via the WebSocket push, and app-side taps show up in the
+server's state immediately, with no page reload either direction.
+
+## Testing it live (GitHub Pages)
+
+A GitHub Actions workflow (`.github/workflows/deploy-web.yml`) builds the
+Flutter web app and publishes it to GitHub Pages on every push to `main`
+(and to `cursor/**` branches, for testing before merge).
+
+**One-time setup required** (repo admin, can't be done from a PR): in the
+repo's **Settings -> Pages**, set **Build and deployment -> Source** to
+**"GitHub Actions"**. After that, pushes automatically deploy, and the app
+is reachable at:
+
+```
+https://<owner>.github.io/<repo>/
+```
+
+This is a real (if secondary, per the mobile-first design) build of the
+app - it defaults to local-demo-mode, so it's fully interactive with no
+backend required. If you have a `nexus_server` reachable from your
+browser (e.g. over Tailscale), append `?server=<host>:8765` to the Pages
+URL to point it at live data instead.
 
 ## Testing
 

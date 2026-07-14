@@ -1,0 +1,66 @@
+name: Deploy web app to GitHub Pages
+
+# Builds the NEXUS Flutter app for web and publishes it to GitHub Pages so
+# it can be opened in any browser for quick testing (mobile-first design,
+# but this is the fastest way to poke at it without a device/simulator).
+#
+# One-time manual step required: in the repo's Settings -> Pages, set
+# "Build and deployment" -> Source to "GitHub Actions". After that, this
+# workflow deploys automatically.
+
+on:
+  push:
+    branches:
+      - main
+      - 'cursor/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.5'
+          channel: stable
+
+      - name: Install shared package dependencies
+        run: dart pub get
+        working-directory: shared
+
+      - name: Install app dependencies
+        run: flutter pub get
+        working-directory: app
+
+      - name: Analyze
+        run: flutter analyze
+        working-directory: app
+
+      - name: Test
+        run: flutter test
+        working-directory: app
+
+      - name: Build web (base href /${{ github.event.repository.name }}/)
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+        working-directory: app
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/build/web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
