@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import '../../icons/nexus_icons.dart';
 import '../../state/compound_scope.dart';
+import '../../state/server_client.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/press_scale.dart';
@@ -42,7 +43,7 @@ class _NexusAiTabState extends State<NexusAiTab> {
     super.dispose();
   }
 
-  void _send(String text) {
+  void _send(String text) async {
     if (text.trim().isEmpty || _typing) return;
     final store = CompoundScope.of(context);
     setState(() {
@@ -51,15 +52,20 @@ class _NexusAiTabState extends State<NexusAiTab> {
     });
     _textController.clear();
     _scrollToBottom();
-    Future.delayed(const Duration(milliseconds: 750), () {
-      if (!mounted) return;
-      final reply = generateAssistantReply(text, store);
-      setState(() {
-        _messages.add(ChatMessage(role: ChatRole.assistant, text: reply));
-        _typing = false;
-      });
-      _scrollToBottom();
+
+    // In live mode, the server's OllamaBridge answers (with the same
+    // local-heuristics fallback if Ollama itself isn't reachable);
+    // otherwise this demo's own rule-based responder handles it.
+    final reply = store is ServerClient
+        ? await store.sendChat(text)
+        : await Future.delayed(const Duration(milliseconds: 750), () => generateAssistantReply(text, store));
+
+    if (!mounted) return;
+    setState(() {
+      _messages.add(ChatMessage(role: ChatRole.assistant, text: reply));
+      _typing = false;
     });
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {

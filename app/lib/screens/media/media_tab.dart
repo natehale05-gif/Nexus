@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:nexus_shared/nexus_shared.dart';
 import '../../icons/nexus_icons.dart';
 import '../../state/compound_scope.dart';
-import '../../state/compound_store.dart';
+import '../../state/nexus_data_source.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/press_scale.dart';
@@ -62,7 +62,7 @@ class _NowPlayingCard extends StatelessWidget {
   const _NowPlayingCard({required this.nowPlaying, required this.store});
 
   final NowPlaying nowPlaying;
-  final CompoundStore store;
+  final NexusDataSource store;
 
   @override
   Widget build(BuildContext context) {

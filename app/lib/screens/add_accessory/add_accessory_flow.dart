@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:nexus_shared/nexus_shared.dart';
 import '../../icons/nexus_icons.dart';
 import '../../state/compound_scope.dart';
-import '../../state/compound_store.dart';
+import '../../state/nexus_data_source.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 import 'assign_step.dart';
@@ -122,7 +122,7 @@ class _AddAccessoryFlowState extends State<AddAccessoryFlow> {
     );
   }
 
-  Widget _content(CompoundStore store) {
+  Widget _content(NexusDataSource store) {
     switch (_step) {
       case _FlowStep.scan:
         return ScanStep(onDone: () => setState(() => _step = _FlowStep.results));

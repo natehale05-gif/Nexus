@@ -1,5 +1,5 @@
 import 'package:nexus_shared/nexus_shared.dart';
-import '../../state/compound_store.dart';
+import '../../state/nexus_data_source.dart';
 
 enum ChatRole { user, assistant }
 
@@ -52,7 +52,7 @@ Active insights: ${insights.isEmpty ? 'none' : insights}
 /// (Section 8) - matches a handful of the suggestion-chip intents against
 /// live compound state and, where applicable, actually mutates the store
 /// before replying.
-String generateAssistantReply(String userText, CompoundStore store) {
+String generateAssistantReply(String userText, NexusDataSource store) {
   final compound = store.compound;
   final text = userText.toLowerCase();
 
