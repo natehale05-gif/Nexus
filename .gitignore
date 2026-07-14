@@ -4,8 +4,10 @@
 .dart_tool/
 .packages
 build/
-# If you're building an application, you may want to check-in your pubspec.lock
-pubspec.lock
+
+# pubspec.lock is checked in for the app/ and server/ applications
+# (reproducible builds) but ignored for the shared/ library package - see
+# shared/.gitignore, matching standard Dart package guidance.
 
 # Directory created by dartdoc
 # If you don't generate documentation locally you can remove this line.

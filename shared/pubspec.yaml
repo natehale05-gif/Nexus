@@ -1,0 +1,13 @@
+name: nexus_shared
+description: Shared data models, enums, and pure business logic (insights engine) used by both the NEXUS Flutter app and the NEXUS Dart server.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.25.0
