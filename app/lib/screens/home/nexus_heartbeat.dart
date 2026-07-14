@@ -2,11 +2,20 @@ import 'package:flutter/widgets.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 
-/// Small pulsing green "NEXUS" wordmark + dot, bottom-left of the map - a
-/// quiet system-online heartbeat, deliberately *not* a data widget
-/// (Section 3).
+/// Small pulsing "NEXUS" wordmark + dot, bottom-left of the map - a quiet
+/// system-online heartbeat, deliberately *not* a data widget (Section 3).
+///
+/// [connectionState] is purely cosmetic and doesn't add app chrome: green
+/// stays the default local-demo-mode heartbeat, but when the app is
+/// running in live mode against a real server (Section 9's `?server=`
+/// wiring) it reflects that connection so testers can tell at a glance
+/// whether they're looking at demo or live data.
+enum HeartbeatConnection { demo, live, liveConnecting }
+
 class NexusHeartbeat extends StatefulWidget {
-  const NexusHeartbeat({super.key});
+  const NexusHeartbeat({super.key, this.connectionState = HeartbeatConnection.demo});
+
+  final HeartbeatConnection connectionState;
 
   @override
   State<NexusHeartbeat> createState() => _NexusHeartbeatState();
@@ -20,6 +29,27 @@ class _NexusHeartbeatState extends State<NexusHeartbeat> with SingleTickerProvid
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Color get _dotColor {
+    switch (widget.connectionState) {
+      case HeartbeatConnection.demo:
+      case HeartbeatConnection.live:
+        return NexusColors.green;
+      case HeartbeatConnection.liveConnecting:
+        return NexusColors.amber;
+    }
+  }
+
+  String? get _suffix {
+    switch (widget.connectionState) {
+      case HeartbeatConnection.demo:
+        return null;
+      case HeartbeatConnection.live:
+        return ' · LIVE';
+      case HeartbeatConnection.liveConnecting:
+        return ' · CONNECTING';
+    }
   }
 
   @override
@@ -36,9 +66,9 @@ class _NexusHeartbeatState extends State<NexusHeartbeat> with SingleTickerProvid
               height: 7,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: NexusColors.green.withValues(alpha: opacity),
+                color: _dotColor.withValues(alpha: opacity),
                 boxShadow: [
-                  BoxShadow(color: NexusColors.green.withValues(alpha: opacity * 0.6), blurRadius: 6),
+                  BoxShadow(color: _dotColor.withValues(alpha: opacity * 0.6), blurRadius: 6),
                 ],
               ),
             );
@@ -46,7 +76,7 @@ class _NexusHeartbeatState extends State<NexusHeartbeat> with SingleTickerProvid
         ),
         const SizedBox(width: 7),
         Text(
-          'NEXUS',
+          'NEXUS${_suffix ?? ''}',
           style: NexusText.caption.copyWith(
             color: const Color(0xFFFFFFFF).withValues(alpha: 0.72),
             fontSize: 11,

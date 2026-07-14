@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:nexus_shared/nexus_shared.dart';
 import '../../icons/nexus_icons.dart';
 import '../../state/compound_scope.dart';
+import '../../state/server_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/nexus_sheet.dart';
 import '../../widgets/press_scale.dart';
@@ -121,7 +122,16 @@ class _HomeTabState extends State<HomeTab> {
                 Positioned(
                   left: 16,
                   bottom: 16,
-                  child: SafeArea(top: false, child: const NexusHeartbeat()),
+                  child: SafeArea(
+                    top: false,
+                    child: NexusHeartbeat(
+                      connectionState: switch (store) {
+                        ServerClient(isConnected: true) => HeartbeatConnection.live,
+                        ServerClient() => HeartbeatConnection.liveConnecting,
+                        _ => HeartbeatConnection.demo,
+                      },
+                    ),
+                  ),
                 ),
                 Positioned(
                   right: 16,
