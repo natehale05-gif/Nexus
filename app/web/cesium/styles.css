@@ -348,3 +348,26 @@ body {
     display: none;
   }
 }
+
+/* Embedded in the Flutter shell: the app supplies the brand (top-left) and
+   the section menu (top-right), so hide the map's own brand and slide its
+   controls/info panel clear of that floating chrome and the add button. */
+.embedded .nx-brand {
+  display: none;
+}
+.embedded .nx-controls {
+  top: 66px;
+  right: 16px;
+}
+.embedded .nx-info {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%) translateY(150%);
+}
+.embedded .nx-info.show {
+  transform: translateX(-50%) translateY(0);
+}
+.embedded .nx-legend {
+  bottom: 18px;
+  left: 16px;
+}

@@ -1,5 +1,8 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/widgets.dart';
 import 'package:nexus_shared/nexus_shared.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 import '../../icons/nexus_icons.dart';
 import '../../state/compound_scope.dart';
 import '../../state/server_client.dart';
@@ -8,6 +11,7 @@ import '../../widgets/nexus_sheet.dart';
 import '../../widgets/press_scale.dart';
 import '../add_accessory/add_accessory_flow.dart';
 import '../building/building_view.dart';
+import '../nav_menu.dart';
 import 'cesium_map.dart';
 import 'crit_insight_pill.dart';
 import 'map_painter.dart';
@@ -16,8 +20,9 @@ import 'vehicle_pin.dart';
 import 'zone_pin.dart';
 import 'zone_sheet.dart';
 
-/// Home tab (Section 3): the map *is* Home - full bleed, edge to edge, no
-/// header chrome above it. There is no separate Map/Compound tab.
+/// Home tab (Section 3): the map *is* Home - full bleed, edge to edge. The
+/// only chrome is a floating brand/status pill (top-left), the section menu
+/// (top-right), and the add-accessory button (bottom-right), Apple-Maps style.
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
 
@@ -62,6 +67,11 @@ class _HomeTabState extends State<HomeTab> {
         final critInsight = compound.insights
             .where((i) => i.level == Level.crit && !_dismissedInsightIds.contains(i.id))
             .firstOrNull;
+        final connection = switch (store) {
+          ServerClient(isConnected: true) => HeartbeatConnection.live,
+          ServerClient() => HeartbeatConnection.liveConnecting,
+          _ => HeartbeatConnection.demo,
+        };
 
         return LayoutBuilder(builder: (context, constraints) {
           final size = constraints.biggest;
@@ -101,66 +111,96 @@ class _HomeTabState extends State<HomeTab> {
                         onTap: () => setState(() => _activeVehicleId = _activeVehicleId == vehicle.id ? null : vehicle.id),
                       ),
                     ),
+
+                // Floating brand + connection status (top-left).
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 16, top: 12),
+                      child: _MapChip(
+                        child: NexusHeartbeat(connectionState: connection),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Section menu (top-right).
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16, top: 12),
+                      child: const NexusMenuButton(onDark: true),
+                    ),
+                  ),
+                ),
+
                 if (activeVehicle != null)
                   Positioned(
-                    top: 14,
+                    top: 0,
                     left: 16,
                     right: 16,
                     child: SafeArea(
                       bottom: false,
-                      child: VehicleStatusCard(
-                        vehicle: activeVehicle,
-                        onClose: () => setState(() => _activeVehicleId = null),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 62),
+                        child: PointerInterceptor(
+                          child: VehicleStatusCard(
+                            vehicle: activeVehicle,
+                            onClose: () => setState(() => _activeVehicleId = null),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 if (critInsight != null)
                   Positioned(
-                    top: 14,
+                    top: 0,
                     left: 0,
                     right: 0,
                     child: SafeArea(
                       bottom: false,
-                      child: Center(
-                        child: CritInsightPill(
-                          insight: critInsight,
-                          onDismiss: () => setState(() => _dismissedInsightIds.add(critInsight.id)),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 62),
+                        child: Center(
+                          child: PointerInterceptor(
+                            child: CritInsightPill(
+                              insight: critInsight,
+                              onDismiss: () => setState(() => _dismissedInsightIds.add(critInsight.id)),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                Positioned(
-                  left: 16,
-                  bottom: 16,
-                  child: SafeArea(
-                    top: false,
-                    child: NexusHeartbeat(
-                      connectionState: switch (store) {
-                        ServerClient(isConnected: true) => HeartbeatConnection.live,
-                        ServerClient() => HeartbeatConnection.liveConnecting,
-                        _ => HeartbeatConnection.demo,
-                      },
-                    ),
-                  ),
-                ),
+
+                // Add accessory (bottom-right).
                 Positioned(
                   right: 16,
                   bottom: 16,
                   child: SafeArea(
                     top: false,
-                    child: PressScale(
-                      onTap: () => showAddAccessoryFlow(context),
-                      child: Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: NexusColors.blue,
-                          shape: BoxShape.circle,
-                          boxShadow: const [
-                            BoxShadow(color: Color(0x66000000), blurRadius: 12, offset: Offset(0, 4)),
-                          ],
+                    child: PointerInterceptor(
+                      child: PressScale(
+                        onTap: () => showAddAccessoryFlow(context),
+                        child: Container(
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            color: NexusColors.blue,
+                            shape: BoxShape.circle,
+                            boxShadow: const [
+                              BoxShadow(color: Color(0x55007AFF), blurRadius: 18, offset: Offset(0, 6)),
+                              BoxShadow(color: Color(0x40000000), blurRadius: 10, offset: Offset(0, 3)),
+                            ],
+                          ),
+                          child: const Center(child: NexusIcon(NexusGlyph.plus, size: 22, color: Color(0xFFFFFFFF))),
                         ),
-                        child: const Center(child: NexusIcon(NexusGlyph.plus, size: 20, color: Color(0xFFFFFFFF))),
                       ),
                     ),
                   ),
@@ -170,6 +210,38 @@ class _HomeTabState extends State<HomeTab> {
           );
         });
       },
+    );
+  }
+}
+
+/// A translucent, blurred capsule for floating chrome over the map - the
+/// frosted-glass "material" that makes the Home map feel like Apple Maps.
+class _MapChip extends StatelessWidget {
+  const _MapChip({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(NexusRadii.pill),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: const Color(0x40101528),
+            borderRadius: BorderRadius.circular(NexusRadii.pill),
+            border: Border.all(color: const Color(0x33FFFFFF), width: 0.8),
+            boxShadow: const [
+              BoxShadow(color: Color(0x22000000), blurRadius: 14, offset: Offset(0, 4)),
+            ],
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }

@@ -128,6 +128,12 @@
 
   // --- Boot -----------------------------------------------------------------
   async function boot() {
+    // When embedded inside the Flutter app shell (an <iframe>), the app
+    // provides its own brand + section menu chrome, so we tuck the map's own
+    // overlays out of the way (see the `.embedded` rules in styles.css).
+    if (window.self !== window.top) {
+      document.body.classList.add('embedded');
+    }
     if (!cfg.ionToken || cfg.ionToken.indexOf('REPLACE') !== -1) {
       showToast('<b>Missing Cesium ion token.</b><br/>Set NEXUS_CONFIG.ionToken in data.js.');
       hideLoading();
