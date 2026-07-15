@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
+    <meta name="theme-color" content="#12172a" />
+    <link rel="icon" href="data:," />
+    <title>NEXUS · Compound 3D</title>
+
+    <!-- CesiumJS from jsDelivr (resolves to the latest 1.x release). -->
+    <script>
+      window.CESIUM_BASE_URL =
+        'https://cdn.jsdelivr.net/npm/cesium@1/Build/Cesium/';
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/cesium@1/Build/Cesium/Cesium.js"></script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/cesium@1/Build/Cesium/Widgets/widgets.css"
+      rel="stylesheet"
+    />
+    <link href="styles.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="cesiumContainer"></div>
+
+    <!-- UI overlay -->
+    <div class="nx-overlay">
+      <div class="nx-brand">
+        <div>
+          <div class="nx-logo">NEXUS</div>
+          <div class="nx-sub">Compound · 3D map</div>
+        </div>
+        <span class="nx-badge"><span class="nx-dot"></span>DEMO</span>
+      </div>
+
+      <div class="nx-controls">
+        <button id="btnLayer" class="nx-btn active">Base: Photoreal 3D</button>
+        <button id="btnLabels" class="nx-btn active">Labels: On</button>
+        <button id="btnReset" class="nx-btn">Reset view</button>
+      </div>
+
+      <div class="nx-legend">
+        <div class="nx-legend-title">Compound status</div>
+        <div class="nx-legend-row">
+          <span class="nx-swatch" style="background: #34c759"></span> Nominal
+        </div>
+        <div class="nx-legend-row">
+          <span class="nx-swatch" style="background: #ff9f0a"></span> Attention
+        </div>
+        <div class="nx-legend-row">
+          <span class="nx-swatch" style="background: #ff3b30"></span> Critical
+        </div>
+      </div>
+
+      <div id="info" class="nx-info">
+        <div class="nx-info-head">
+          <div>
+            <div id="infoTitle" class="nx-info-title">—</div>
+            <div id="infoZone" class="nx-info-zone">—</div>
+          </div>
+          <button id="infoClose" class="nx-info-close" aria-label="Close">
+            ✕
+          </button>
+        </div>
+        <div id="infoStatus" class="nx-status-pill">—</div>
+        <div id="infoBody" class="nx-info-body"></div>
+        <div id="infoMeta" class="nx-info-meta"></div>
+      </div>
+    </div>
+
+    <div id="loading" class="nx-loading">
+      <div class="nx-logo">NEXUS</div>
+      <div class="nx-spinner"></div>
+      <div id="loadingMsg" class="nx-loading-msg">Initializing…</div>
+    </div>
+
+    <div id="toast" class="nx-toast"></div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
