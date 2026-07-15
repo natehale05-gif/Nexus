@@ -8,6 +8,7 @@ import '../../widgets/nexus_sheet.dart';
 import '../../widgets/press_scale.dart';
 import '../add_accessory/add_accessory_flow.dart';
 import '../building/building_view.dart';
+import 'cesium_map.dart';
 import 'crit_insight_pill.dart';
 import 'map_painter.dart';
 import 'nexus_heartbeat.dart';
@@ -64,33 +65,42 @@ class _HomeTabState extends State<HomeTab> {
 
         return LayoutBuilder(builder: (context, constraints) {
           final size = constraints.biggest;
+          // On web the map *is* a live CesiumJS scene (photorealistic 3D
+          // tiles + terrain, colored compound buildings, and 3D vehicles),
+          // which owns its own building/vehicle interaction in 3D. Every
+          // other platform keeps the painted tactical map with Flutter pins.
+          final useCesium = cesiumMapSupported;
           return ClipRect(
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: CustomPaint(painter: const MapBackgroundPainter()),
+                  child: useCesium
+                      ? buildCesiumMap()
+                      : CustomPaint(painter: const MapBackgroundPainter()),
                 ),
-                for (final zone in compound.zones)
-                  Positioned(
-                    left: zone.mapX * size.width - NexusTapTargets.mapPin / 2,
-                    top: zone.mapY * size.height - NexusTapTargets.mapPin / 2,
-                    child: ZonePin(
-                      zone: zone,
-                      status: computeZoneStatus(compound, zone.id),
-                      selected: zone.id == _selectedZoneId,
-                      onTap: () => _openZoneSheet(context, zone),
-                      onLongPress: () => _openBuildingView(context, zone),
+                if (!useCesium)
+                  for (final zone in compound.zones)
+                    Positioned(
+                      left: zone.mapX * size.width - NexusTapTargets.mapPin / 2,
+                      top: zone.mapY * size.height - NexusTapTargets.mapPin / 2,
+                      child: ZonePin(
+                        zone: zone,
+                        status: computeZoneStatus(compound, zone.id),
+                        selected: zone.id == _selectedZoneId,
+                        onTap: () => _openZoneSheet(context, zone),
+                        onLongPress: () => _openBuildingView(context, zone),
+                      ),
                     ),
-                  ),
-                for (final vehicle in compound.vehicles)
-                  Positioned(
-                    left: vehicle.mapX * size.width - NexusTapTargets.mapPin / 2,
-                    top: vehicle.mapY * size.height - NexusTapTargets.mapPin / 2,
-                    child: VehiclePin(
-                      vehicle: vehicle,
-                      onTap: () => setState(() => _activeVehicleId = _activeVehicleId == vehicle.id ? null : vehicle.id),
+                if (!useCesium)
+                  for (final vehicle in compound.vehicles)
+                    Positioned(
+                      left: vehicle.mapX * size.width - NexusTapTargets.mapPin / 2,
+                      top: vehicle.mapY * size.height - NexusTapTargets.mapPin / 2,
+                      child: VehiclePin(
+                        vehicle: vehicle,
+                        onTap: () => setState(() => _activeVehicleId = _activeVehicleId == vehicle.id ? null : vehicle.id),
+                      ),
                     ),
-                  ),
                 if (activeVehicle != null)
                   Positioned(
                     top: 14,

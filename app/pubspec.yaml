@@ -36,6 +36,11 @@ dependencies:
 
   web_socket_channel: ^3.0.1
 
+  # Used only by the web build to embed the CesiumJS 3D compound map as an
+  # <iframe> platform view (see screens/home/cesium_map_web.dart). Already
+  # pulled in transitively; pinned here so the direct import is explicit.
+  web: ^1.1.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
