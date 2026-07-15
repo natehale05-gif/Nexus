@@ -14,7 +14,9 @@ shared/   Pure-Dart models, enums, the insights engine, the demo/simulation
           the server so they never drift out of sync.
 app/      The Flutter app (iOS/Android/macOS/web). Mobile-first, map-first
           Home tab, bottom-sheet + full-screen building views, bespoke
-          stroke-icon set, no third-party UI/state-management packages.
+          stroke-icon set, no third-party UI/state-management packages. On the
+          web build the Home map is a live CesiumJS 3D scene (web/cesium/),
+          embedded as a platform view.
 server/   The Dart server: WebSocket state sync (8765) + REST (8766),
           protocol bridge interfaces, and the proactive insights engine
           running server-side.
@@ -33,6 +35,41 @@ itself from `nexus_shared`'s `buildDemoCompound()` and runs the same
 simulation tick the server uses, so every screen is fully interactive with
 no server required. This matches the build order in the original spec
 (Section 9, step 5: "wired to local state first, no server yet").
+
+## The 3D compound map (CesiumJS)
+
+On the **web** build, the Home tab's map is a real 3D scene rendered with
+[CesiumJS](https://cesium.com/platform/cesiumjs/), living in
+[`app/web/cesium/`](app/web/cesium/):
+
+- **Google Photorealistic 3D Tiles** (real-world buildings + terrain) as the
+  base layer, with a one-tap toggle to **Cesium World Terrain + OSM
+  Buildings**.
+- **Colored 3D compound buildings** - the Main House, Barn, Shop, Cabin, and
+  Gates are extruded footprints colored by status (green = nominal, amber =
+  attention, red = critical), with floating labels.
+- **3D vehicles** - the F-250 is a glTF model patrolling the perimeter road,
+  and the Model Y sits parked in the driveway. Tap any building or vehicle for
+  a themed status panel.
+
+The buildings/vehicles are laid out from the same normalized map coordinates
+the Flutter app uses, projected onto real ground at a configurable anchor.
+
+**Configuring the location.** Edit `center` (and optionally `spanMeters` /
+`heading`) at the top of [`app/web/cesium/data.js`](app/web/cesium/data.js),
+or override per-visit with URL query params, e.g.
+`.../cesium/?lat=44.59&lon=-123.24&span=380`. The default anchor is flat
+Willamette Valley farmland just east of Corvallis, OR.
+
+**Cesium ion token.** The map authenticates to Cesium ion (for the
+Photorealistic 3D Tiles + terrain) with the public client token in
+`data.js` (`NEXUS_CONFIG.ionToken`). It's a browser-side access token, so
+it's fine to commit; swap in your own from
+[cesium.com/ion/tokens](https://cesium.com/ion/tokens) if you prefer.
+
+The map is a self-contained static bundle (Cesium loads from a CDN), so you
+can also open it **standalone** without the Flutter shell - handy for quick
+iteration - at `.../cesium/` (see the GitHub Pages section below).
 
 ## Running the server
 
@@ -106,9 +143,19 @@ https://<owner>.github.io/<repo>/
 
 This is a real (if secondary, per the mobile-first design) build of the
 app - it defaults to local-demo-mode, so it's fully interactive with no
-backend required. If you have a `nexus_server` reachable from your
-browser (e.g. over Tailscale), append `?server=<host>:8765` to the Pages
-URL to point it at live data instead.
+backend required. The Home tab shows the CesiumJS 3D compound map described
+above. If you have a `nexus_server` reachable from your browser (e.g. over
+Tailscale), append `?server=<host>:8765` to the Pages URL to point it at
+live data instead.
+
+The 3D map is also served **standalone** (outside the Flutter shell) at:
+
+```
+https://<owner>.github.io/<repo>/cesium/
+```
+
+which is the quickest way to test the Cesium view on its own - it loads the
+Photorealistic 3D Tiles, colored buildings, and 3D vehicles directly.
 
 ## Testing
 
