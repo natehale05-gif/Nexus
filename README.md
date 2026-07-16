@@ -130,7 +130,7 @@ server's state immediately, with no page reload either direction.
 
 A GitHub Actions workflow (`.github/workflows/deploy-web.yml`) builds the
 Flutter web app and publishes it to GitHub Pages on every push to `main`
-(and to `cursor/**` branches, for testing before merge).
+(and to `cursor/**` / `claude/**` branches, for testing before merge).
 
 **One-time setup required** (repo admin, can't be done from a PR): in the
 repo's **Settings -> Pages**, set **Build and deployment -> Source** to
