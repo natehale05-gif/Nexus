@@ -3,13 +3,10 @@ import 'dart:ui' as ui;
 import 'package:flutter/widgets.dart';
 import 'package:nexus_shared/nexus_shared.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
-import '../../icons/nexus_icons.dart';
 import '../../state/compound_scope.dart';
 import '../../state/server_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/nexus_sheet.dart';
-import '../../widgets/press_scale.dart';
-import '../add_accessory/add_accessory_flow.dart';
 import '../building/building_view.dart';
 import '../nav_menu.dart';
 import 'cesium_map.dart';
@@ -21,8 +18,8 @@ import 'zone_pin.dart';
 import 'zone_sheet.dart';
 
 /// Home tab (Section 3): the map *is* Home - full bleed, edge to edge. The
-/// only chrome is a floating brand/status pill (top-left), the section menu
-/// (top-right), and the add-accessory button (bottom-right), Apple-Maps style.
+/// only chrome is a floating brand/status pill (top-left) and the section
+/// menu (top-right), Apple-Maps style.
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
 
@@ -178,33 +175,6 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ),
                   ),
-
-                // Add accessory (bottom-right).
-                Positioned(
-                  right: 16,
-                  bottom: 16,
-                  child: SafeArea(
-                    top: false,
-                    child: PointerInterceptor(
-                      child: PressScale(
-                        onTap: () => showAddAccessoryFlow(context),
-                        child: Container(
-                          width: 54,
-                          height: 54,
-                          decoration: BoxDecoration(
-                            color: NexusColors.blue,
-                            shape: BoxShape.circle,
-                            boxShadow: const [
-                              BoxShadow(color: Color(0x55007AFF), blurRadius: 18, offset: Offset(0, 6)),
-                              BoxShadow(color: Color(0x40000000), blurRadius: 10, offset: Offset(0, 3)),
-                            ],
-                          ),
-                          child: const Center(child: NexusIcon(NexusGlyph.plus, size: 22, color: Color(0xFFFFFFFF))),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           );
