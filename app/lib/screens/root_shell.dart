@@ -4,6 +4,7 @@ import 'home/home_tab.dart';
 import 'security/security_tab.dart';
 import 'media/media_tab.dart';
 import 'nexus_ai/nexus_ai_tab.dart';
+import 'settings/settings_tab.dart';
 import 'nav_menu.dart';
 
 /// App shell. Navigation is a single Apple-style pop-up menu in the top-right
@@ -30,6 +31,8 @@ class _RootShellState extends State<RootShell> {
         return const MediaTab();
       case NexusTab.nexusAi:
         return const NexusAiTab();
+      case NexusTab.settings:
+        return const SettingsTab();
     }
   }
 

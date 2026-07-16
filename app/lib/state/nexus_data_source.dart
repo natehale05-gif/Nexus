@@ -1,6 +1,25 @@
 import 'package:flutter/foundation.dart';
 import 'package:nexus_shared/nexus_shared.dart';
 
+/// Where the active [NexusDataSource] currently stands with its backing
+/// server, so any screen can show a consistent status regardless of which
+/// implementation is active. [CompoundStore] (local-demo-mode) is always
+/// [demo]; only [ServerClient] (live mode) moves through the others.
+enum ConnectionStatus {
+  /// Local-only demo mode - there is no real server to be connected to.
+  demo,
+
+  /// A live connection is being established (first attempt).
+  connecting,
+
+  /// Connected and authenticated; [NexusDataSource.compound] reflects the
+  /// server's real state.
+  connected,
+
+  /// A previously-working connection dropped and is being retried.
+  reconnecting,
+}
+
 /// Common interface for wherever the app's live [Compound] tree comes
 /// from. [CompoundStore] implements this for local-demo-mode (owns the
 /// state directly, runs the simulation ticker); [ServerClient] implements
@@ -10,6 +29,8 @@ import 'package:nexus_shared/nexus_shared.dart';
 /// through [CompoundScope] without knowing which it is.
 abstract class NexusDataSource extends ChangeNotifier {
   Compound get compound;
+
+  ConnectionStatus get connectionStatus;
 
   void toggleLight(String id);
   void setBrightness(String id, double value);

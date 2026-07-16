@@ -21,6 +21,9 @@ class CompoundStore extends NexusDataSource {
   final _random = Random();
 
   @override
+  ConnectionStatus get connectionStatus => ConnectionStatus.demo;
+
+  @override
   void dispose() {
     _ticker?.cancel();
     super.dispose();

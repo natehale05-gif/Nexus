@@ -79,16 +79,48 @@ dart pub get
 dart run bin/server.dart
 ```
 
-This starts:
-- `ws://localhost:8765` - state sync (pushes the full compound on connect
+This starts (bound to all interfaces by default, so it's reachable at
+`localhost` locally or the machine's LAN/Tailscale address remotely):
+- `ws://<host>:8765` - state sync (pushes the full compound on connect
   and again on every change; accepts `command` and `chat` messages - see
   `server/lib/transport/websocket_hub.dart` for the wire protocol).
-- `http://localhost:8766` - REST (`/health`, `/state`, `/command/<name>`,
+- `http://<host>:8766` - REST (`/health`, `/state`, `/command/<name>`,
   `/chat` - see `server/lib/transport/rest_api.dart`).
 
 The server boots from the same seed compound as the app and runs the same
 simulation ticker, so `curl localhost:8766/state` and the app's local demo
 state look identical at boot.
+
+**Configuration.** All of the following are optional environment variables
+(see `server/lib/config.dart`); the defaults match a plain local run:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `NEXUS_BIND_ADDRESS` | `0.0.0.0` | Interface to bind both servers to |
+| `NEXUS_WS_PORT` | `8765` | WebSocket state-sync port |
+| `NEXUS_REST_PORT` | `8766` | REST API port |
+| `NEXUS_DATA_DIR` | `~/.nexus` | Where the pairing token and state snapshot live |
+
+**State persistence.** The server snapshots its compound state to
+`$NEXUS_DATA_DIR/state.json` a few seconds after every change (and once
+more on a clean shutdown), and loads it back on the next boot - restarting
+the server no longer resets every device to the demo seed.
+
+**Pairing token (auth).** On first boot, the server generates a random
+pairing token and writes it to `$NEXUS_DATA_DIR/pairing_token`, printing it
+once to the console:
+
+```
+generated a new pairing token - enter this in the app to connect:
+  <token>
+```
+
+Every device has to present this token to connect (as a `Bearer` header on
+REST, or as the first WebSocket message) - see
+`server/lib/auth/pairing_token.dart`. It's a single shared secret for the
+household, not per-user login; delete the token file and restart the
+server to rotate it (this immediately disconnects every paired device
+until they're re-entered in Settings).
 
 ### What's real vs. simulated in the server
 
@@ -114,10 +146,25 @@ live against a real `nexus_server` instance via `ServerClient` - both
 implement the same `NexusDataSource` interface, so no screen code cares
 which one is active.
 
-To use live mode on web, append `?server=<host>:8765` to the app's URL,
-e.g. `http://localhost:PORT/?server=localhost:8765` for `flutter run -d
-chrome`, or `https://your-pages-url/?server=192.168.1.50:8765` for a
-built/deployed copy talking to a server on your LAN or over Tailscale.
+**Settings tab (recommended, all platforms).** Open the section menu ->
+**Settings**, enter the server's address and the pairing token printed in
+its startup log, and tap **Connect**. This is persisted on-device (secure
+storage), so the app reconnects automatically on every future launch -
+no relaunching, no URL to retype. **Forget This Server** clears it and
+drops back to local-demo-mode.
+
+**`?server=` query param (web, quick testing only).** Append
+`?server=<host>&token=<token>` to the app's URL, e.g.
+`http://localhost:PORT/?server=localhost:8765&token=<token>` for `flutter
+run -d chrome`. This always overrides a persisted Settings connection,
+which makes it handy for one-off testing against a different server
+without touching the paired connection.
+
+Either path accepts a bare host (`192.168.1.50:8765`, defaults to
+`ws://`) or a Tailscale MagicDNS name (`myhouse.tailnet-name.ts.net`,
+defaults to `wss://` on port 443 - see **Remote access with Tailscale**
+below for why). An explicit `ws://`/`wss://` scheme always wins over the
+default.
 
 `ServerClient` mirrors whatever the server pushes over WebSocket and sends
 every mutation back as a `command` message instead of applying it
@@ -125,6 +172,31 @@ locally - the server is the single source of truth. This has been
 verified end-to-end: server-side REST mutations show up in the app
 instantly via the WebSocket push, and app-side taps show up in the
 server's state immediately, with no page reload either direction.
+
+## Remote access with Tailscale
+
+To reach your `nexus_server` from any device, anywhere - not just on the
+home LAN - install [Tailscale](https://tailscale.com) on the server
+machine and on every device running the app, then front the server with
+`tailscale serve` so it gets a real HTTPS/WSS address via your tailnet's
+MagicDNS name and auto-provisioned cert:
+
+```bash
+tailscale serve --bg --https=443 8766   # REST
+tailscale serve --bg --https=8765 8765  # WebSocket state sync
+```
+
+Then use that MagicDNS name (e.g. `myhouse.tailnet-name.ts.net`) as the
+server address in the app's Settings tab. This matters for more than
+convenience: a browser will flatly refuse to open a plain `ws://`
+connection from an `https://` page (the GitHub Pages build is always
+served over HTTPS), so reaching the server from the Pages build - or any
+`https://` deployment - requires a real `wss://` front door like this one,
+not a raw LAN IP.
+
+No public ports need to be opened on your router for this - Tailscale's
+own encrypted mesh handles reachability, and only devices in your tailnet
+can resolve or reach the MagicDNS name.
 
 ## Testing it live (GitHub Pages)
 
@@ -144,9 +216,11 @@ https://<owner>.github.io/<repo>/
 This is a real (if secondary, per the mobile-first design) build of the
 app - it defaults to local-demo-mode, so it's fully interactive with no
 backend required. The Home tab shows the CesiumJS 3D compound map described
-above. If you have a `nexus_server` reachable from your browser (e.g. over
-Tailscale), append `?server=<host>:8765` to the Pages URL to point it at
-live data instead.
+above. To point it at a real server instead, use the in-app **Settings**
+tab (persists across visits) or append `?server=<host>&token=<token>` to
+the Pages URL for a one-off test - either way, since this page is served
+over HTTPS, the server needs a `wss://`-capable front door (see **Remote
+access with Tailscale** above) rather than a raw LAN `ws://` address.
 
 The 3D map is also served **standalone** (outside the Flutter shell) at:
 

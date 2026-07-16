@@ -36,6 +36,10 @@ dependencies:
 
   web_socket_channel: ^3.0.1
 
+  # Persists the paired server address + pairing token on-device (Keychain/
+  # Keystore/etc.) so a device only needs to connect once.
+  flutter_secure_storage: ^10.3.1
+
   # Used only by the web build to embed the CesiumJS 3D compound map as an
   # <iframe> platform view (see screens/home/cesium_map_web.dart). Already
   # pulled in transitively; pinned here so the direct import is explicit.

@@ -43,6 +43,7 @@ enum NexusGlyph {
   sparkle,
   mapPinBase,
   motion,
+  gear,
 }
 
 /// A single bespoke stroke icon rendered with [CustomPainter].
@@ -188,6 +189,8 @@ class _NexusIconPainter extends CustomPainter {
         _paintMapPinBase(canvas, rect);
       case NexusGlyph.motion:
         _paintMotion(canvas, rect);
+      case NexusGlyph.gear:
+        _paintGear(canvas, rect);
     }
     canvas.restore();
   }
@@ -605,6 +608,22 @@ class _NexusIconPainter extends CustomPainter {
       canvas.drawLine(Offset(r.left + dx, r.top + r.height * 0.2),
           Offset(r.left + dx - r.width * 0.14, r.bottom - r.height * 0.2), _stroke);
     }
+  }
+
+  void _paintGear(Canvas canvas, Rect r) {
+    final center = r.center;
+    final outerRadius = r.width * 0.3;
+    final toothLength = r.width * 0.12;
+    const teeth = 8;
+    for (var i = 0; i < teeth; i++) {
+      final angle = i * (2 * math.pi / teeth);
+      final inner = Offset(center.dx + math.cos(angle) * outerRadius, center.dy + math.sin(angle) * outerRadius);
+      final outer = Offset(
+          center.dx + math.cos(angle) * (outerRadius + toothLength), center.dy + math.sin(angle) * (outerRadius + toothLength));
+      canvas.drawLine(inner, outer, _stroke);
+    }
+    canvas.drawCircle(center, outerRadius, _stroke);
+    canvas.drawCircle(center, r.width * 0.13, _stroke);
   }
 
   @override

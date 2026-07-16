@@ -62,7 +62,7 @@ void main() {
   });
 
   test('receives the initial state push and reflects it in compound', () async {
-    final client = ServerClient(hostOrUrl: '127.0.0.1:$port');
+    final client = ServerClient(hostOrUrl: '127.0.0.1:$port', token: 'test-token');
     addTearDown(client.dispose);
 
     await _waitFor(() => client.isConnected);
@@ -72,7 +72,7 @@ void main() {
   });
 
   test('toggleLight sends a command and reflects the broadcasted result', () async {
-    final client = ServerClient(hostOrUrl: '127.0.0.1:$port');
+    final client = ServerClient(hostOrUrl: '127.0.0.1:$port', token: 'test-token');
     addTearDown(client.dispose);
     await _waitFor(() => client.isConnected);
 
@@ -88,7 +88,7 @@ void main() {
   });
 
   test('sendChat resolves with the server reply', () async {
-    final client = ServerClient(hostOrUrl: '127.0.0.1:$port');
+    final client = ServerClient(hostOrUrl: '127.0.0.1:$port', token: 'test-token');
     addTearDown(client.dispose);
     await _waitFor(() => client.isConnected);
 

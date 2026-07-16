@@ -1,10 +1,15 @@
+import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
 
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
+import 'package:nexus_server/auth/auth_middleware.dart';
+import 'package:nexus_server/auth/pairing_token.dart';
+import 'package:nexus_server/config.dart';
 import 'package:nexus_server/integrations/integrations_manager.dart';
+import 'package:nexus_server/state/persistence.dart';
 import 'package:nexus_server/state/server_compound.dart';
 import 'package:nexus_server/state/simulation_ticker.dart';
 import 'package:nexus_server/transport/command_dispatcher.dart';
@@ -14,27 +19,54 @@ import 'package:nexus_server/transport/websocket_hub.dart';
 /// NEXUS server entry point (Section 8/9): WebSocket state sync on 8765,
 /// REST on 8766, running on the Mac Studio M4 Max home server in a real
 /// deployment. Run with `dart run bin/server.dart` from `server/`.
+///
+/// Configurable via environment variables (see `lib/config.dart`):
+/// `NEXUS_BIND_ADDRESS`, `NEXUS_WS_PORT`, `NEXUS_REST_PORT`, `NEXUS_DATA_DIR`.
 Future<void> main(List<String> args) async {
-  final server = ServerCompound();
+  final config = ServerConfig.fromEnvironment();
+
+  final pairingToken = PairingToken(config.pairingTokenFile);
+  if (pairingToken.isNew) {
+    log('generated a new pairing token - enter this in the app to connect:', name: 'nexus.server');
+    log('  ${pairingToken.value}', name: 'nexus.server');
+  } else {
+    log('loaded existing pairing token from ${config.pairingTokenFile.path}', name: 'nexus.server');
+  }
+
+  final persistence = CompoundPersistence(config.snapshotFile);
+  final server = ServerCompound(seed: persistence.load());
   final integrations = IntegrationsManager(server);
   final dispatcher = CommandDispatcher(server, integrations);
-  final wsHub = WebSocketHub(server, dispatcher, integrations.ollama);
+  final wsHub = WebSocketHub(server, dispatcher, integrations.ollama, pairingToken);
   final restApi = RestApi(server, dispatcher, integrations.ollama);
   final ticker = SimulationTicker(server);
+
+  Timer? saveTimer;
+  server.onChange.listen((compound) {
+    saveTimer?.cancel();
+    saveTimer = Timer(const Duration(seconds: 3), () => persistence.save(compound));
+  });
 
   await integrations.startAll();
   wsHub.startBroadcasting();
   ticker.start();
 
-  final wsServer = await shelf_io.serve(wsHub.handler, InternetAddress.anyIPv4, 8765);
+  final bindAddress = InternetAddress(config.bindAddress);
+
+  final wsServer = await shelf_io.serve(wsHub.handler, bindAddress, config.wsPort);
   log('WebSocket state sync listening on ws://${wsServer.address.host}:${wsServer.port}', name: 'nexus.server');
 
-  final restHandler = const Pipeline().addMiddleware(logRequests()).addHandler(restApi.handler);
-  final restServer = await shelf_io.serve(restHandler, InternetAddress.anyIPv4, 8766);
+  final restHandler = const Pipeline()
+      .addMiddleware(logRequests())
+      .addMiddleware(requireToken(pairingToken))
+      .addHandler(restApi.handler);
+  final restServer = await shelf_io.serve(restHandler, bindAddress, config.restPort);
   log('REST API listening on http://${restServer.address.host}:${restServer.port}', name: 'nexus.server');
 
   ProcessSignal.sigint.watch().listen((_) async {
     log('shutting down', name: 'nexus.server');
+    saveTimer?.cancel();
+    persistence.save(server.compound);
     ticker.stop();
     await integrations.stopAll();
     await wsServer.close(force: true);

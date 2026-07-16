@@ -8,9 +8,9 @@ import '../theme/text_styles.dart';
 import '../theme/tokens.dart';
 import '../widgets/press_scale.dart';
 
-/// The four top-level sections. Navigation moved from a bottom tab bar to a
+/// The top-level sections. Navigation moved from a bottom tab bar to a
 /// single Apple-style pop-up menu in the top-right (see [NexusMenuButton]).
-enum NexusTab { home, security, media, nexusAi }
+enum NexusTab { home, security, media, nexusAi, settings }
 
 class NexusTabSpec {
   const NexusTabSpec(this.tab, this.label, this.glyph);
@@ -24,6 +24,7 @@ const List<NexusTabSpec> nexusTabs = [
   NexusTabSpec(NexusTab.security, 'Security', NexusGlyph.camera),
   NexusTabSpec(NexusTab.media, 'Media', NexusGlyph.tv),
   NexusTabSpec(NexusTab.nexusAi, 'NEXUS', NexusGlyph.sparkle),
+  NexusTabSpec(NexusTab.settings, 'Settings', NexusGlyph.gear),
 ];
 
 NexusTabSpec specFor(NexusTab tab) => nexusTabs.firstWhere((s) => s.tab == tab);
