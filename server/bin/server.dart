@@ -9,6 +9,8 @@ import 'package:nexus_server/auth/auth_middleware.dart';
 import 'package:nexus_server/auth/pairing_token.dart';
 import 'package:nexus_server/config.dart';
 import 'package:nexus_server/integrations/integrations_manager.dart';
+import 'package:nexus_server/media/library_index.dart';
+import 'package:nexus_server/media/library_scanner.dart';
 import 'package:nexus_server/state/persistence.dart';
 import 'package:nexus_server/state/server_compound.dart';
 import 'package:nexus_server/state/simulation_ticker.dart';
@@ -21,7 +23,8 @@ import 'package:nexus_server/transport/websocket_hub.dart';
 /// deployment. Run with `dart run bin/server.dart` from `server/`.
 ///
 /// Configurable via environment variables (see `lib/config.dart`):
-/// `NEXUS_BIND_ADDRESS`, `NEXUS_WS_PORT`, `NEXUS_REST_PORT`, `NEXUS_DATA_DIR`.
+/// `NEXUS_BIND_ADDRESS`, `NEXUS_WS_PORT`, `NEXUS_REST_PORT`, `NEXUS_DATA_DIR`,
+/// `NEXUS_MEDIA_ROOT`.
 Future<void> main(List<String> args) async {
   final config = ServerConfig.fromEnvironment();
 
@@ -36,9 +39,17 @@ Future<void> main(List<String> args) async {
   final persistence = CompoundPersistence(config.snapshotFile);
   final server = ServerCompound(seed: persistence.load());
   final integrations = IntegrationsManager(server);
-  final dispatcher = CommandDispatcher(server, integrations);
+
+  final library = LibraryIndex(LibraryScanner(Directory(config.mediaRoot)));
+  log('scanning media library at ${config.mediaRoot}…', name: 'nexus.server');
+  await library.rescan();
+  server.compound.mediaStats = library.stats();
+  server.compound.continueWatching = library.continueWatching(server.compound.playbackPositions);
+  log('found ${library.items.length} media item(s)', name: 'nexus.server');
+
+  final dispatcher = CommandDispatcher(server, integrations, library);
   final wsHub = WebSocketHub(server, dispatcher, integrations.ollama, pairingToken);
-  final restApi = RestApi(server, dispatcher, integrations.ollama);
+  final restApi = RestApi(server, dispatcher, integrations.ollama, library, pairingToken);
   final ticker = SimulationTicker(server);
 
   Timer? saveTimer;

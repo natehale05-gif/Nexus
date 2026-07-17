@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
 import 'state/compound_scope.dart';
 import 'state/compound_store.dart';
 import 'state/connection_scope.dart';
@@ -9,6 +10,9 @@ import 'theme/app_theme.dart';
 import 'screens/root_shell.dart';
 
 void main() {
+  // Required once at startup before any media_kit Player is created (Media
+  // tab real playback - see screens/media/media_tab.dart).
+  MediaKit.ensureInitialized();
   runApp(const NexusApp());
 }
 

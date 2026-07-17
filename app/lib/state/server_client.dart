@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:crypto/crypto.dart';
 import 'package:nexus_shared/nexus_shared.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -51,13 +52,14 @@ class ServerClient extends NexusDataSource {
 
   /// Bare LAN-shaped addresses (a raw IP, `localhost`, `*.local`, or any
   /// single-label hostname with no domain suffix) default to plain
-  /// `ws://` on port 8765 - that's how the server listens directly on the
-  /// LAN. Anything else (in particular a Tailscale MagicDNS name like
-  /// `myhouse.tailnet-name.ts.net`) defaults to `wss://` on port 443,
-  /// since that's the shape of address a `tailscale serve` HTTPS front
-  /// door has - which is also required for a `https://*.github.io` page
-  /// to reach it at all (browsers block plain `ws://` from an https:// origin).
-  /// An explicit `ws://`/`wss://` scheme in [hostOrUrl] always wins.
+  /// `ws://` - that's how the server listens directly on the LAN. Anything
+  /// else (in particular a Tailscale MagicDNS name like
+  /// `myhouse.tailnet-name.ts.net`) defaults to `wss://`, since that's
+  /// required for a `https://*.github.io` page to reach it at all (browsers
+  /// block plain `ws://` from an https:// origin) - see the root README's
+  /// "Remote access with Tailscale" section for fronting both ports with
+  /// `tailscale serve`. An explicit `ws://`/`wss://` scheme in [hostOrUrl]
+  /// always wins.
   static bool _isLanShaped(String hostAndMaybePort) {
     final host = hostAndMaybePort.split(':').first;
     if (host == 'localhost') return true;
@@ -73,12 +75,35 @@ class ServerClient extends NexusDataSource {
       value = '$scheme://$value';
     }
     final uri = Uri.parse(value);
-    if (uri.hasPort) return uri;
-    return uri.replace(port: uri.scheme == 'wss' ? 443 : 8765);
+    // Always default to the WebSocket port (8765) - the REST/streaming port
+    // is derived from this one (see [_restBaseUri]) as "one more" (8766),
+    // matching the server's own default pairing and the tailscale-serve
+    // setup documented in the README, so there's only ever one address to
+    // configure.
+    return uri.hasPort ? uri : uri.replace(port: 8765);
   }
+
+  /// The REST API's base URL, derived from the WebSocket [uri] - the
+  /// server always runs REST on the port right after the WebSocket one
+  /// (8765/8766 by default, or whatever a `tailscale serve` setup fronts
+  /// them as, as long as it keeps that same +1 pairing).
+  Uri _restBaseUri() => Uri(
+        scheme: uri.scheme == 'wss' ? 'https' : 'http',
+        host: uri.host,
+        port: uri.port + 1,
+      );
 
   @override
   Compound get compound => _compound;
+
+  @override
+  Uri? mediaStreamUri(String itemId) {
+    final streamToken = sha256.convert(utf8.encode('$token:$itemId')).toString();
+    return _restBaseUri().replace(
+      path: '/media/stream/$itemId',
+      queryParameters: {'token': streamToken},
+    );
+  }
 
   void _connect() {
     _status = _everConnected ? ConnectionStatus.reconnecting : ConnectionStatus.connecting;
@@ -204,12 +229,22 @@ class ServerClient extends NexusDataSource {
 
   @override
   void setNowPlayingState(bool playing) {
-    // No server-side now-playing mutator yet (Jellyfin bridge is a stub) -
-    // reflect it optimistically so the transport controls still feel
-    // responsive in live mode.
+    // Reflect it optimistically too, so the transport controls feel
+    // responsive even before the round-trip completes.
     compound.nowPlaying?.isPlaying = playing;
     notifyListeners();
+    _send('setNowPlayingState', {'value': playing});
   }
+
+  @override
+  void playLibraryItem(String itemId) => _send('playLibraryItem', {'id': itemId});
+
+  @override
+  void reportPlaybackPosition(String itemId, double positionSeconds) =>
+      _send('setPlaybackPosition', {'id': itemId, 'value': positionSeconds});
+
+  @override
+  void rescanLibrary() => _send('rescanLibrary', const {});
 
   @override
   void turnOffAllLights() => _send('turnOffAllLights', const {});

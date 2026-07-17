@@ -1,6 +1,7 @@
 import 'package:nexus_shared/nexus_shared.dart';
 
 import '../integrations/integrations_manager.dart';
+import '../media/library_index.dart';
 import '../state/server_compound.dart';
 
 /// Executes one named command with JSON args against [ServerCompound].
@@ -9,10 +10,11 @@ import '../state/server_compound.dart';
 /// commands/queries") so both transports expose the identical command
 /// surface.
 class CommandDispatcher {
-  CommandDispatcher(this.server, this.integrations);
+  CommandDispatcher(this.server, this.integrations, this.library);
 
   final ServerCompound server;
   final IntegrationsManager integrations;
+  final LibraryIndex library;
 
   /// Returns a JSON-able result map. Throws [ArgumentError] for unknown
   /// commands or missing/invalid args - callers should turn that into a
@@ -43,6 +45,14 @@ class CommandDispatcher {
         server.setLocked(_id(args), _bool(args, 'value'));
       case 'setMediaOn':
         server.setMediaOn(_id(args), _bool(args, 'value'));
+      case 'playLibraryItem':
+        _playLibraryItem(_id(args));
+      case 'setNowPlayingState':
+        server.mutate(() => server.compound.nowPlaying?.isPlaying = _bool(args, 'value'));
+      case 'setPlaybackPosition':
+        _setPlaybackPosition(_id(args), _num(args, 'value').toDouble());
+      case 'rescanLibrary':
+        _rescanLibrary();
       case 'turnOffAllLights':
         server.turnOffAllLights();
       case 'setGrillCloudOnline':
@@ -53,6 +63,35 @@ class CommandDispatcher {
         throw ArgumentError('Unknown command: $command');
     }
     return {'ok': true, 'compound': server.compound.toJson()};
+  }
+
+  void _playLibraryItem(String itemId) {
+    final item = library.byId(itemId);
+    if (item == null) throw ArgumentError('Unknown library item: $itemId');
+    server.mutate(() {
+      server.compound.nowPlaying = library.nowPlayingFor(item, server.compound.playbackPositions, isPlaying: true);
+    });
+  }
+
+  void _setPlaybackPosition(String itemId, double positionSeconds) {
+    server.mutate(() {
+      server.compound.playbackPositions[itemId] = positionSeconds;
+      if (server.compound.nowPlaying?.itemId == itemId) {
+        server.compound.nowPlaying!.positionSeconds = positionSeconds;
+      }
+    });
+  }
+
+  void _rescanLibrary() {
+    // Fire-and-forget: the filesystem walk is async, but `dispatch` itself
+    // stays synchronous (matching every other command) - the result shows
+    // up as a normal state broadcast once the rescan finishes.
+    library.rescan().then((_) {
+      server.mutate(() {
+        server.compound.mediaStats = library.stats();
+        server.compound.continueWatching = library.continueWatching(server.compound.playbackPositions);
+      });
+    });
   }
 
   String _id(Map<String, dynamic> args) => _str(args, 'id');

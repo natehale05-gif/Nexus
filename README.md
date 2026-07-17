@@ -2,9 +2,11 @@
 
 NEXUS is the single control surface for a 50+ acre compound near Corvallis,
 OR: a map-first Flutter app talking to a companion Dart server that bridges
-every local protocol (WiFi, Zigbee, Z-Wave, Meshtastic mesh, gate GPIO) plus
-a handful of cloud-dependent integrations (Jellyfin, Ollama, Frigate, UniFi,
-and - the one integration that's inherently cloud-gated - Traeger).
+every local protocol (WiFi, Zigbee, Z-Wave, Meshtastic mesh, gate GPIO),
+**replaces Jellyfin/Plex outright** with its own media library scanner +
+streamer (not a bridge to an external Jellyfin instance), and adds a handful
+of other integrations (Ollama, Frigate, UniFi, and - the one that's
+inherently cloud-gated - Traeger).
 
 This repo is a monorepo with three packages:
 
@@ -109,6 +111,7 @@ state look identical at boot.
 | `NEXUS_WS_PORT` | `8765` | WebSocket state-sync port |
 | `NEXUS_REST_PORT` | `8766` | REST API port |
 | `NEXUS_DATA_DIR` | `~/.nexus` | Where the pairing token and state snapshot live |
+| `NEXUS_MEDIA_ROOT` | `$NEXUS_DATA_DIR/media` | Folder the media library scanner walks for movies/TV |
 
 **State persistence.** The server snapshots its compound state to
 `$NEXUS_DATA_DIR/state.json` a few seconds after every change (and once
@@ -133,20 +136,50 @@ until they're re-entered in Settings).
 
 ### What's real vs. simulated in the server
 
-This environment has no actual Zigbee2MQTT/Z-Wave JS UI/Frigate/UniFi/
-Jellyfin instances, no Traeger account, and no physical mesh/GPIO hardware
-to bridge to. Rather than faking protocol implementations that would look
-real but do nothing, every bridge in `server/lib/integrations/` is a
-clearly documented interface describing exactly what a real implementation
-needs to do (which topics to subscribe to, which endpoints to poll, how
-auth works), backed by `SimulationTicker` standing in for all of them.
+This environment has no actual Zigbee2MQTT/Z-Wave JS UI/Frigate/UniFi
+instances, no Traeger account, and no physical mesh/GPIO hardware to bridge
+to. Rather than faking protocol implementations that would look real but do
+nothing, every bridge in `server/lib/integrations/` other than the two
+below is a clearly documented interface describing exactly what a real
+implementation needs to do (which topics to subscribe to, which endpoints
+to poll, how auth works), backed by `SimulationTicker` standing in for all
+of them.
 
-The one exception is **Ollama** (`server/lib/integrations/ollama_bridge.dart`):
-it's a real HTTP client against a local Ollama instance. If one happens to
-be reachable, NEXUS AI chat actually goes through it, including `<action>`
-tag parsing so the model can execute commands. If it isn't reachable (the
-expected case without a Mac Studio nearby), it falls back to a small
-rule-based responder over the same live compound context and says so.
+Two exceptions are real:
+
+- **Ollama** (`server/lib/integrations/ollama_bridge.dart`) - a real HTTP
+  client against a local Ollama instance. If one happens to be reachable,
+  NEXUS AI chat actually goes through it, including `<action>` tag parsing
+  so the model can execute commands. If it isn't reachable (the expected
+  case without a Mac Studio nearby), it falls back to a small rule-based
+  responder over the same live compound context and says so.
+- **Media** (`server/lib/media/`) - a real filesystem library scanner and
+  HTTP range-request streaming server for movies/TV, replacing Jellyfin
+  outright rather than bridging to one. See **Media library** below.
+
+### Media library (replacing Jellyfin)
+
+`server/lib/media/` scans `NEXUS_MEDIA_ROOT` for `.mp4`/`.mkv`/`.mov`/`.m4v`/
+`.avi`/`.webm` files (recursively), derives titles/years/episode numbers
+from file and folder names (no metadata service like TMDB - results are
+heuristic, not perfect), and serves them with real HTTP range-request
+support at `GET /media/stream/<id>` so seeking works in the app's player.
+
+**Requires `ffprobe`** (part of [ffmpeg](https://ffmpeg.org)) on the host to
+read file durations - install it and make sure it's on `PATH` before
+starting the server. If it's missing, the library still scans, just with
+unknown durations for every item, rather than failing outright.
+
+**Direct-play only** - there's no transcoding, so a file's codec/container
+needs to be something the viewing device/browser can decode natively
+(H.264/AAC in an `.mp4` is the safest bet). This is a deliberate, named
+scope limit, not a bug.
+
+Playback position is tracked per item and persists across restarts/rescans
+(`Compound.playbackPositions`, part of the regular state snapshot). The
+Settings tab shows the scanned library's item counts and has a **Rescan
+Library** button (run it after adding/removing files - the library isn't
+watched automatically).
 
 ## App -> server live mode
 
@@ -169,11 +202,15 @@ run -d chrome`. This always overrides a persisted Settings connection,
 which makes it handy for one-off testing against a different server
 without touching the paired connection.
 
-Either path accepts a bare host (`192.168.1.50:8765`, defaults to
-`ws://`) or a Tailscale MagicDNS name (`myhouse.tailnet-name.ts.net`,
-defaults to `wss://` on port 443 - see **Remote access with Tailscale**
-below for why). An explicit `ws://`/`wss://` scheme always wins over the
-default.
+Either path accepts a bare host (`192.168.1.50`, defaults to `ws://`) or a
+Tailscale MagicDNS name (`myhouse.tailnet-name.ts.net`, defaults to
+`wss://` - see **Remote access with Tailscale** below for why). Either way,
+if no port is given it defaults to `8765` (the WebSocket port); the app
+derives the REST/streaming base URL from that automatically as "one port
+higher" (`8766`), so there's only ever one address to configure - just keep
+that same pairing if you customize the ports via `NEXUS_WS_PORT`/
+`NEXUS_REST_PORT`. An explicit `ws://`/`wss://` scheme, or an explicit port,
+always wins over the default.
 
 `ServerClient` mirrors whatever the server pushes over WebSocket and sends
 every mutation back as a `command` message instead of applying it
@@ -191,17 +228,19 @@ machine and on every device running the app, then front the server with
 MagicDNS name and auto-provisioned cert:
 
 ```bash
-tailscale serve --bg --https=443 8766   # REST
 tailscale serve --bg --https=8765 8765  # WebSocket state sync
+tailscale serve --bg --https=8766 8766  # REST + media streaming
 ```
 
-Then use that MagicDNS name (e.g. `myhouse.tailnet-name.ts.net`) as the
-server address in the app's Settings tab. This matters for more than
-convenience: a browser will flatly refuse to open a plain `ws://`
-connection from an `https://` page (the GitHub Pages build is always
-served over HTTPS), so reaching the server from the Pages build - or any
-`https://` deployment - requires a real `wss://` front door like this one,
-not a raw LAN IP.
+(matching ports on both sides keeps the app's "REST is the WebSocket port
++1" derivation - see **App -> server live mode** above - working unchanged
+whether you're on the LAN or going through Tailscale.) Then use that
+MagicDNS name (e.g. `myhouse.tailnet-name.ts.net`) as the server address in
+the app's Settings tab. This matters for more than convenience: a browser
+will flatly refuse to open a plain `ws://` connection from an `https://`
+page (the GitHub Pages build is always served over HTTPS), so reaching the
+server from the Pages build - or any `https://` deployment - requires a
+real `wss://` front door like this one, not a raw LAN IP.
 
 No public ports need to be opened on your router for this - Tailscale's
 own encrypted mesh handles reachability, and only devices in your tailnet
@@ -225,11 +264,16 @@ https://<owner>.github.io/<repo>/
 This is a real (if secondary, per the mobile-first design) build of the
 app - it defaults to local-demo-mode, so it's fully interactive with no
 backend required. The Home tab shows the CesiumJS 3D compound map described
-above. To point it at a real server instead, use the in-app **Settings**
-tab (persists across visits) or append `?server=<host>&token=<token>` to
-the Pages URL for a one-off test - either way, since this page is served
-over HTTPS, the server needs a `wss://`-capable front door (see **Remote
-access with Tailscale** above) rather than a raw LAN `ws://` address.
+above; the Media tab shows simulated demo titles with no real video. To
+point it at a real server instead - for real device control, real media
+playback, and everything else backed by `server/lib/` - use the in-app
+**Settings** tab (persists across visits) or append
+`?server=<host>&token=<token>` to the Pages URL for a one-off test - either
+way, since this page is served over HTTPS, the server needs a
+`wss://`-capable front door (see **Remote access with Tailscale** above)
+rather than a raw LAN `ws://` address. GitHub Pages itself never runs any
+server-side code - it's purely the client half of this, always talking to
+a `nexus_server` you run somewhere real.
 
 The 3D map is also served **standalone** (outside the Flutter shell) at:
 

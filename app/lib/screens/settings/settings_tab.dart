@@ -199,6 +199,52 @@ class _SettingsTabState extends State<SettingsTab> {
                         ],
                       ),
                     ),
+                    if (store.connectionStatus == ConnectionStatus.connected) ...[
+                      const SizedBox(height: 20),
+                      Text('Media Library', style: NexusText.footnote),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: NexusColors.surface,
+                          borderRadius: BorderRadius.circular(NexusRadii.card),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${store.compound.mediaStats.movieCount} movies · '
+                              '${store.compound.mediaStats.showCount} shows · '
+                              '${store.compound.mediaStats.episodeCount} episodes',
+                              style: NexusText.body,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Scanned from the folder set by NEXUS_MEDIA_ROOT on the server.',
+                              style: NexusText.footnote,
+                            ),
+                            const SizedBox(height: 16),
+                            PressScale(
+                              onTap: store.rescanLibrary,
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 15),
+                                decoration: BoxDecoration(
+                                  color: NexusColors.secondarySurface,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Rescan Library',
+                                    style: NexusText.headline.copyWith(color: NexusColors.blue),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

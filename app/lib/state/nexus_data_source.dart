@@ -50,6 +50,24 @@ abstract class NexusDataSource extends ChangeNotifier {
   void setMediaOn(String id, bool on);
   void setNowPlayingState(bool playing);
 
+  /// Starts playing a library item (e.g. a tapped Continue Watching tile),
+  /// making it the new "now playing".
+  void playLibraryItem(String itemId);
+
+  /// Reports the real player's current position for [itemId], so it
+  /// persists server-side and survives a restart/reconnect. Called
+  /// periodically during playback, not every frame.
+  void reportPlaybackPosition(String itemId, double positionSeconds);
+
+  /// Re-scans the server's media library folder for new/removed files.
+  /// No-op in local-demo-mode (nothing to scan).
+  void rescanLibrary();
+
+  /// The URL to stream [itemId]'s file from, or null if there's no real
+  /// server to stream from (local-demo-mode) - callers should fall back to
+  /// a placeholder rather than attempting playback.
+  Uri? mediaStreamUri(String itemId);
+
   void turnOffAllLights();
 
   void addDevice(Device device);

@@ -1,8 +1,14 @@
+import 'dart:io';
+
 import 'package:nexus_shared/nexus_shared.dart';
+import 'package:nexus_server/media/library_index.dart';
+import 'package:nexus_server/media/library_scanner.dart';
 import 'package:nexus_server/state/server_compound.dart';
 import 'package:nexus_server/transport/command_dispatcher.dart';
 import 'package:nexus_server/integrations/integrations_manager.dart';
 import 'package:test/test.dart';
+
+LibraryIndex _emptyLibrary() => LibraryIndex(LibraryScanner(Directory.systemTemp));
 
 void main() {
   group('ServerCompound', () {
@@ -41,7 +47,7 @@ void main() {
     test('dispatches setBrightness and turns the light on', () {
       final server = ServerCompound();
       final integrations = IntegrationsManager(server);
-      final dispatcher = CommandDispatcher(server, integrations);
+      final dispatcher = CommandDispatcher(server, integrations, _emptyLibrary());
       final light = server.compound.devices.whereType<LightDevice>().first
         ..on = false
         ..brightness = 0;
@@ -55,9 +61,52 @@ void main() {
     test('throws for an unknown command', () {
       final server = ServerCompound();
       final integrations = IntegrationsManager(server);
-      final dispatcher = CommandDispatcher(server, integrations);
+      final dispatcher = CommandDispatcher(server, integrations, _emptyLibrary());
 
       expect(() => dispatcher.dispatch('doesNotExist', const {}), throwsArgumentError);
+    });
+
+    test('setPlaybackPosition records position and updates a matching nowPlaying', () {
+      final server = ServerCompound();
+      final integrations = IntegrationsManager(server);
+      final dispatcher = CommandDispatcher(server, integrations, _emptyLibrary());
+      server.compound.nowPlaying = NowPlaying(
+        itemId: 'abc',
+        title: 'Test Movie',
+        durationSeconds: 100,
+        positionSeconds: 0,
+        isPlaying: true,
+      );
+
+      dispatcher.dispatch('setPlaybackPosition', {'id': 'abc', 'value': 42});
+
+      expect(server.compound.playbackPositions['abc'], 42);
+      expect(server.compound.nowPlaying!.positionSeconds, 42);
+    });
+
+    test('setNowPlayingState toggles isPlaying', () {
+      final server = ServerCompound();
+      final integrations = IntegrationsManager(server);
+      final dispatcher = CommandDispatcher(server, integrations, _emptyLibrary());
+      server.compound.nowPlaying = NowPlaying(
+        itemId: 'abc',
+        title: 'Test Movie',
+        durationSeconds: 100,
+        positionSeconds: 0,
+        isPlaying: true,
+      );
+
+      dispatcher.dispatch('setNowPlayingState', {'value': false});
+
+      expect(server.compound.nowPlaying!.isPlaying, isFalse);
+    });
+
+    test('playLibraryItem throws for an unknown item id', () {
+      final server = ServerCompound();
+      final integrations = IntegrationsManager(server);
+      final dispatcher = CommandDispatcher(server, integrations, _emptyLibrary());
+
+      expect(() => dispatcher.dispatch('playLibraryItem', {'id': 'nope'}), throwsArgumentError);
     });
   });
 }

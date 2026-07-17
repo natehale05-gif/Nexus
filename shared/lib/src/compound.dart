@@ -24,12 +24,14 @@ class Compound {
     NowPlaying? nowPlaying,
     MediaLibraryStats? mediaStats,
     List<ContinueWatchingItem>? continueWatching,
+    Map<String, double>? playbackPositions,
     WeatherInfo? weather,
   })  : insights = insights ?? [],
         nowPlaying = nowPlaying,
         mediaStats = mediaStats ??
             MediaLibraryStats(movieCount: 0, showCount: 0, episodeCount: 0),
         continueWatching = continueWatching ?? [],
+        playbackPositions = playbackPositions ?? {},
         weather = weather;
 
   final List<Zone> zones;
@@ -43,6 +45,11 @@ class Compound {
   NowPlaying? nowPlaying;
   MediaLibraryStats mediaStats;
   List<ContinueWatchingItem> continueWatching;
+
+  /// Playback position (seconds) per library item id - the persisted source
+  /// of truth for "where did I leave off," survives server restarts and
+  /// library rescans (see `server/lib/media/`).
+  Map<String, double> playbackPositions;
   WeatherInfo? weather;
 
   Building buildingById(String id) => buildings.firstWhere((b) => b.id == id);
@@ -89,6 +96,7 @@ class Compound {
         'nowPlaying': nowPlaying?.toJson(),
         'mediaStats': mediaStats.toJson(),
         'continueWatching': continueWatching.map((c) => c.toJson()).toList(),
+        'playbackPositions': playbackPositions,
         'weather': weather?.toJson(),
       };
 
@@ -127,6 +135,9 @@ class Compound {
         continueWatching: (json['continueWatching'] as List? ?? [])
             .map((e) => ContinueWatchingItem.fromJson(e as Map<String, dynamic>))
             .toList(),
+        playbackPositions: (json['playbackPositions'] as Map?)
+                ?.map((k, v) => MapEntry(k as String, (v as num).toDouble())) ??
+            {},
         weather: json['weather'] == null
             ? null
             : WeatherInfo.fromJson(json['weather'] as Map<String, dynamic>),

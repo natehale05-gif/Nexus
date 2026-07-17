@@ -128,6 +128,34 @@ class CompoundStore extends NexusDataSource {
         compound.nowPlaying?.isPlaying = playing;
       });
 
+  @override
+  void playLibraryItem(String itemId) => _mutate(() {
+        final item = compound.continueWatching.where((c) => c.id == itemId).firstOrNull;
+        if (item == null) return;
+        compound.nowPlaying = NowPlaying(
+          itemId: item.id,
+          title: item.title,
+          durationSeconds: item.durationSeconds,
+          positionSeconds: item.positionSeconds,
+          isPlaying: true,
+        );
+      });
+
+  @override
+  void reportPlaybackPosition(String itemId, double positionSeconds) => _mutate(() {
+        if (compound.nowPlaying?.itemId == itemId) {
+          compound.nowPlaying!.positionSeconds = positionSeconds;
+        }
+      });
+
+  @override
+  void rescanLibrary() {
+    // No real filesystem to scan in local-demo-mode.
+  }
+
+  @override
+  Uri? mediaStreamUri(String itemId) => null;
+
   // ---- Scenes / bulk actions (used by NEXUS AI + insights CTA) ----------
 
   @override
@@ -168,4 +196,8 @@ class CompoundStore extends NexusDataSource {
       notifyListeners();
     }
   }
+}
+
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

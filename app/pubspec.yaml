@@ -40,6 +40,17 @@ dependencies:
   # Keystore/etc.) so a device only needs to connect once.
   flutter_secure_storage: ^10.3.1
 
+  # Derives the same per-item media stream token the server expects (see
+  # server/lib/media/stream_token.dart) - pure-Dart, works on every platform
+  # including web.
+  crypto: ^3.0.7
+
+  # Real video playback for the Media tab - the only Flutter player with
+  # genuine parity across iOS/Android/macOS/web.
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^1.0.7
+
   # Used only by the web build to embed the CesiumJS 3D compound map as an
   # <iframe> platform view (see screens/home/cesium_map_web.dart). Already
   # pulled in transitively; pinned here so the direct import is explicit.
