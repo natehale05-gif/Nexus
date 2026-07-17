@@ -141,43 +141,6 @@ body {
   }
 }
 
-/* Top-right controls */
-.nx-controls {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-end;
-}
-.nx-btn {
-  pointer-events: auto;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--nx-text);
-  background: var(--nx-panel);
-  border: 1px solid var(--nx-border);
-  border-radius: 11px;
-  padding: 9px 13px;
-  cursor: pointer;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  transition: background 0.15s ease, transform 0.08s ease;
-  white-space: nowrap;
-}
-.nx-btn:hover {
-  background: rgba(30, 38, 66, 0.92);
-}
-.nx-btn:active {
-  transform: scale(0.97);
-}
-.nx-btn.active {
-  color: var(--nx-cyan);
-  border-color: rgba(110, 231, 247, 0.55);
-}
-
 /* Legend (bottom-left) */
 .nx-legend {
   position: absolute;
@@ -374,13 +337,9 @@ body {
 
 /* Embedded in the Flutter shell: the app supplies the brand (top-left) and
    the section menu (top-right), so hide the map's own brand and slide its
-   controls/info panel clear of that floating chrome and the add button. */
+   info panel clear of that floating chrome and the add button. */
 .embedded .nx-brand {
   display: none;
-}
-.embedded .nx-controls {
-  top: 66px;
-  right: 16px;
 }
 .embedded .nx-info {
   right: auto;

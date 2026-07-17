@@ -25,7 +25,6 @@
   const ctx = canvas ? canvas.getContext('2d') : null;
 
   let active = false;
-  let labelsOn = true;
   let rafId = null;
   let startTime = 0;
   let layout = { scale: 0, offsetX: 0, offsetY: 0 };
@@ -138,7 +137,7 @@
       ctx.strokeStyle = 'rgba(0,0,0,0.35)';
       ctx.stroke();
 
-      if (labelsOn) drawLabel(b.name, px, y - 8);
+      drawLabel(b.name, px, y - 8);
 
       hitList.push({ kind: 'building', data: b, shape: { type: 'rect', x, y, w, h } });
     }
@@ -156,7 +155,7 @@
       ctx.strokeStyle = 'rgba(11,15,30,0.8)';
       ctx.stroke();
 
-      if (labelsOn) drawLabel(v.name, px, py - r - 8);
+      drawLabel(v.name, px, py - r - 8);
 
       hitList.push({ kind: 'vehicle', data: v, shape: { type: 'circle', x: px, y: py, r: r + 4 } });
     }
@@ -213,9 +212,6 @@
       if (badge) badge.hidden = true;
       if (rafId) cancelAnimationFrame(rafId);
       rafId = null;
-    },
-    setLabelsOn(value) {
-      labelsOn = !!value;
     },
   };
 })();

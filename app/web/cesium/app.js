@@ -26,7 +26,6 @@
     infoBody: document.getElementById('infoBody'),
     infoMeta: document.getElementById('infoMeta'),
     infoClose: document.getElementById('infoClose'),
-    btnLabels: document.getElementById('btnLabels'),
   };
 
   function setLoading(msg) {
@@ -56,10 +55,7 @@
     offlineActive = true;
     const cesiumContainer = document.getElementById('cesiumContainer');
     if (cesiumContainer) cesiumContainer.style.display = 'none';
-    if (window.NexusOfflineMap) {
-      window.NexusOfflineMap.setLabelsOn(labelsOn);
-      window.NexusOfflineMap.activate();
-    }
+    if (window.NexusOfflineMap) window.NexusOfflineMap.activate();
     hideLoading();
     showToast(
       '<b>Running in offline mode.</b><br/>Photorealistic 3D Tiles aren’t reachable, so a simplified compound map is shown instead.',
@@ -266,17 +262,14 @@
     // Build vehicles (models with box fallback).
     await buildVehicles(viewer);
 
-    // Wire up interaction, controls, camera.
+    // Wire up interaction, camera.
     wireInteraction(viewer);
-    wireControls();
 
     flyToCompound(viewer);
     hideLoading();
   }
 
   // --- Buildings ------------------------------------------------------------
-  const buildingLabels = [];
-  let labelsOn = true;
   function buildBuildings(viewer, cornerMap) {
     for (const b of window.NEXUS_BUILDINGS) {
       const corners = cornerMap.get(b.id);
@@ -321,7 +314,7 @@
 
       // Floating label above the building.
       const center = centerOfCorners(corners);
-      const label = viewer.entities.add({
+      viewer.entities.add({
         position: Cesium.Cartesian3.fromRadians(
           center.longitude,
           center.latitude,
@@ -350,7 +343,6 @@
         },
         properties: { kind: 'building', data: b },
       });
-      buildingLabels.push(label);
     }
   }
 
@@ -625,21 +617,6 @@
   // Exposed so offline_map.js's Canvas2D fallback can open the same info
   // panel on a building/vehicle click instead of duplicating this logic.
   window.NexusInfoPanel = { showBuildingInfo, showVehicleInfo, hideInfo, paintStatus, hexA };
-
-  // --- Controls -------------------------------------------------------------
-  function wireControls() {
-    els.btnLabels &&
-      els.btnLabels.addEventListener('click', () => {
-        labelsOn = !labelsOn;
-        buildingLabels.forEach((e) => {
-          if (e.label) e.label.show = labelsOn;
-        });
-        els.btnLabels.classList.toggle('active', labelsOn);
-        els.btnLabels.textContent = labelsOn ? 'Labels: On' : 'Labels: Off';
-        if (window.NexusOfflineMap) window.NexusOfflineMap.setLabelsOn(labelsOn);
-      });
-    els.btnLabels && els.btnLabels.classList.add('active');
-  }
 
   // --- Camera ---------------------------------------------------------------
   let compoundSphere = null;
