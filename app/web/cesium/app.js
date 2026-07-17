@@ -1,12 +1,13 @@
 /* global Cesium */
 // NEXUS compound - CesiumJS 3D map.
 //
-// Renders Google Photorealistic 3D Tiles (buildings + terrain) as the base,
-// drops colored extruded "compound" buildings on the real ground, and adds
-// 3D vehicles (glTF models with a stylized-box fallback), including one that
-// patrols the perimeter road. Clicking a building or vehicle opens a themed
-// info panel. A toggle swaps between Photorealistic tiles and Cesium World
-// Terrain + OSM Buildings.
+// Renders Google Photorealistic 3D Tiles (buildings + terrain) as the base -
+// the only tile-based mode - drops colored extruded "compound" buildings on
+// the real ground, and adds 3D vehicles (glTF models with a stylized-box
+// fallback), including one that patrols the perimeter road. Clicking a
+// building or vehicle opens a themed info panel. If Photorealistic 3D Tiles
+// can't load (offline, or Cesium ion/Google's tileset unreachable), falls
+// back to a self-contained offline Canvas2D schematic (offline_map.js).
 
 (function () {
   'use strict';
@@ -25,9 +26,7 @@
     infoBody: document.getElementById('infoBody'),
     infoMeta: document.getElementById('infoMeta'),
     infoClose: document.getElementById('infoClose'),
-    btnLayer: document.getElementById('btnLayer'),
     btnLabels: document.getElementById('btnLabels'),
-    btnReset: document.getElementById('btnReset'),
   };
 
   function setLoading(msg) {
@@ -36,11 +35,46 @@
   function hideLoading() {
     els.loading && els.loading.classList.add('hide');
   }
-  function showToast(html) {
+  function showToast(html, autoHideMs) {
     if (!els.toast) return;
     els.toast.innerHTML = html;
     els.toast.classList.add('show');
+    if (autoHideMs) {
+      setTimeout(() => els.toast && els.toast.classList.remove('show'), autoHideMs);
+    }
   }
+
+  // --- Offline fallback -------------------------------------------------------
+  // True network/Photorealistic-3D-Tiles outage handling: when the tiles
+  // can't load (no internet, or Cesium ion/Google's tileset is unreachable),
+  // hide Cesium's container and hand off to the self-contained Canvas2D
+  // schematic in offline_map.js instead. Both failure causes are treated the
+  // same way - there's no attempt to tell "truly offline" apart from an ion
+  // outage, since either way Photorealistic 3D Tiles just aren't available.
+  let offlineActive = false;
+  function activateOfflineFallback() {
+    offlineActive = true;
+    const cesiumContainer = document.getElementById('cesiumContainer');
+    if (cesiumContainer) cesiumContainer.style.display = 'none';
+    if (window.NexusOfflineMap) {
+      window.NexusOfflineMap.setLabelsOn(labelsOn);
+      window.NexusOfflineMap.activate();
+    }
+    hideLoading();
+    showToast(
+      '<b>Running in offline mode.</b><br/>Photorealistic 3D Tiles aren’t reachable, so a simplified compound map is shown instead.',
+      6000
+    );
+  }
+
+  window.addEventListener('offline', () => {
+    if (!offlineActive) activateOfflineFallback();
+  });
+  window.addEventListener('online', () => {
+    // Simplest reliable way back to the live 3D view - re-fetch everything
+    // fresh rather than tearing down/rebuilding a live Cesium viewer in place.
+    if (offlineActive) location.reload();
+  });
 
   // --- Local (compound) -> world helpers -----------------------------------
   let enuFrame = null; // Matrix4 east-north-up at compound center
@@ -135,8 +169,8 @@
       document.body.classList.add('embedded');
     }
     if (!cfg.ionToken || cfg.ionToken.indexOf('REPLACE') !== -1) {
-      showToast('<b>Missing Cesium ion token.</b><br/>Set NEXUS_CONFIG.ionToken in data.js.');
-      hideLoading();
+      console.warn('Missing Cesium ion token - falling back to the offline map.');
+      activateOfflineFallback();
       return;
     }
     Cesium.Ion.defaultAccessToken = cfg.ionToken;
@@ -158,8 +192,8 @@
         infoBox: false,
       });
     } catch (e) {
-      showToast('<b>Failed to start CesiumJS.</b><br/>' + (e && e.message));
-      hideLoading();
+      console.warn('Failed to start CesiumJS, falling back to the offline map.', e);
+      activateOfflineFallback();
       return;
     }
 
@@ -178,7 +212,9 @@
     // Exposed for quick debugging / automated smoke tests.
     window.__nexusViewer = viewer;
 
-    // Photorealistic 3D Tiles (Google, via Cesium ion). Falls back gracefully.
+    // Photorealistic 3D Tiles (Google, via Cesium ion) - the only tile-based
+    // mode. If it's unavailable for any reason (offline, or Cesium ion/
+    // Google's tileset unreachable), fall back to the offline map instead.
     setLoading('Loading Photorealistic 3D Tiles\u2026');
     let photoreal = null;
     try {
@@ -187,14 +223,14 @@
       // Photoreal mesh includes terrain; hide the globe to avoid z-fighting.
       scene.globe.show = false;
     } catch (e) {
-      console.warn('Photorealistic 3D Tiles unavailable, using terrain.', e);
+      console.warn('Photorealistic 3D Tiles unavailable, falling back to the offline map.', e);
       photoreal = null;
-      scene.globe.show = true;
     }
-
-    // OSM Buildings for the "terrain" base layer (created lazily on toggle).
-    let osmBuildings = null;
-    let usingPhotoreal = !!photoreal;
+    if (!photoreal) {
+      viewer.destroy();
+      activateOfflineFallback();
+      return;
+    }
 
     setLoading('Placing compound\u2026');
 
@@ -232,36 +268,15 @@
 
     // Wire up interaction, controls, camera.
     wireInteraction(viewer);
-    wireControls(viewer, {
-      getPhotoreal: () => photoreal,
-      getUsingPhotoreal: () => usingPhotoreal,
-      setUsingPhotoreal: (v) => (usingPhotoreal = v),
-      ensureOsm: async () => {
-        if (!osmBuildings) {
-          try {
-            osmBuildings = await Cesium.createOsmBuildingsAsync();
-            scene.primitives.add(osmBuildings);
-          } catch (e) {
-            console.warn('OSM Buildings unavailable', e);
-          }
-        }
-        return osmBuildings;
-      },
-      scene,
-    });
+    wireControls();
 
     flyToCompound(viewer);
     hideLoading();
-    if (!photoreal) {
-      showToast(
-        '<b>Photorealistic 3D Tiles did not load.</b><br/>Falling back to Cesium World Terrain + OSM Buildings. Check the ion token / quota, then reload.'
-      );
-      setTimeout(() => els.toast && els.toast.classList.remove('show'), 6000);
-    }
   }
 
   // --- Buildings ------------------------------------------------------------
   const buildingLabels = [];
+  let labelsOn = true;
   function buildBuildings(viewer, cornerMap) {
     for (const b of window.NEXUS_BUILDINGS) {
       const corners = cornerMap.get(b.id);
@@ -607,12 +622,12 @@
     els.info && els.info.classList.remove('show');
   }
 
-  // --- Controls -------------------------------------------------------------
-  function wireControls(viewer, ctx) {
-    els.btnReset &&
-      els.btnReset.addEventListener('click', () => flyToCompound(viewer, 1.4));
+  // Exposed so offline_map.js's Canvas2D fallback can open the same info
+  // panel on a building/vehicle click instead of duplicating this logic.
+  window.NexusInfoPanel = { showBuildingInfo, showVehicleInfo, hideInfo, paintStatus, hexA };
 
-    let labelsOn = true;
+  // --- Controls -------------------------------------------------------------
+  function wireControls() {
     els.btnLabels &&
       els.btnLabels.addEventListener('click', () => {
         labelsOn = !labelsOn;
@@ -621,39 +636,9 @@
         });
         els.btnLabels.classList.toggle('active', labelsOn);
         els.btnLabels.textContent = labelsOn ? 'Labels: On' : 'Labels: Off';
+        if (window.NexusOfflineMap) window.NexusOfflineMap.setLabelsOn(labelsOn);
       });
     els.btnLabels && els.btnLabels.classList.add('active');
-
-    els.btnLayer &&
-      els.btnLayer.addEventListener('click', async () => {
-        const photoreal = ctx.getPhotoreal();
-        if (!photoreal) return; // no photoreal available at all
-        const nowPhotoreal = !ctx.getUsingPhotoreal();
-        ctx.setUsingPhotoreal(nowPhotoreal);
-        if (nowPhotoreal) {
-          photoreal.show = true;
-          ctx.scene.globe.show = false;
-          const osm = await ctx.ensureOsm();
-          if (osm) osm.show = false;
-          els.btnLayer.textContent = 'Base: Photoreal 3D';
-          els.btnLayer.classList.add('active');
-        } else {
-          photoreal.show = false;
-          ctx.scene.globe.show = true;
-          const osm = await ctx.ensureOsm();
-          if (osm) osm.show = true;
-          els.btnLayer.textContent = 'Base: Terrain + OSM';
-          els.btnLayer.classList.remove('active');
-        }
-      });
-    if (els.btnLayer) {
-      const hasPhotoreal = !!ctx.getPhotoreal();
-      els.btnLayer.textContent = hasPhotoreal
-        ? 'Base: Photoreal 3D'
-        : 'Base: Terrain + OSM';
-      els.btnLayer.classList.toggle('active', hasPhotoreal);
-      if (!hasPhotoreal) els.btnLayer.disabled = true;
-    }
   }
 
   // --- Camera ---------------------------------------------------------------

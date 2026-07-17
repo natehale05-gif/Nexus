@@ -43,8 +43,7 @@ On the **web** build, the Home tab's map is a real 3D scene rendered with
 [`app/web/cesium/`](app/web/cesium/):
 
 - **Google Photorealistic 3D Tiles** (real-world buildings + terrain) as the
-  base layer, with a one-tap toggle to **Cesium World Terrain + OSM
-  Buildings**.
+  only base layer - there's no alternate terrain/imagery mode to switch to.
 - **Colored 3D compound buildings** - the Main House, Barn, Shop, Cabin, and
   Gates are extruded footprints colored by status (green = nominal, amber =
   attention, red = critical), with floating labels.
@@ -54,6 +53,16 @@ On the **web** build, the Home tab's map is a real 3D scene rendered with
 
 The buildings/vehicles are laid out from the same normalized map coordinates
 the Flutter app uses, projected onto real ground at a configurable anchor.
+
+**Offline fallback.** Photorealistic 3D Tiles need a live connection to
+Cesium ion/Google - if it can't load (no internet, or the tileset is
+otherwise unreachable) or the browser goes offline mid-session, the page
+automatically switches to a self-contained, dependency-free 2D schematic of
+the compound (`app/web/cesium/offline_map.js`, drawn straight from the same
+building/vehicle data with no network calls of its own), with an "OFFLINE"
+badge shown next to the brand chip. Building/vehicle taps still open the same
+info panel. When connectivity returns, the page reloads back into the normal
+3D view.
 
 **Configuring the location.** Edit `center` (and optionally `spanMeters` /
 `heading`) at the top of [`app/web/cesium/data.js`](app/web/cesium/data.js),

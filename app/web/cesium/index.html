@@ -24,6 +24,9 @@
   </head>
   <body>
     <div id="cesiumContainer"></div>
+    <div id="offlineMap" class="nx-offline-map" hidden>
+      <canvas id="offlineCanvas"></canvas>
+    </div>
 
     <!-- UI overlay -->
     <div class="nx-overlay">
@@ -33,12 +36,13 @@
           <div class="nx-sub">Compound · 3D map</div>
         </div>
         <span class="nx-badge"><span class="nx-dot"></span>DEMO</span>
+        <span id="offlineBadge" class="nx-badge nx-badge-offline" hidden>
+          <span class="nx-dot"></span>OFFLINE
+        </span>
       </div>
 
       <div class="nx-controls">
-        <button id="btnLayer" class="nx-btn active">Base: Photoreal 3D</button>
         <button id="btnLabels" class="nx-btn active">Labels: On</button>
-        <button id="btnReset" class="nx-btn">Reset view</button>
       </div>
 
       <div class="nx-legend">
@@ -79,6 +83,7 @@
     <div id="toast" class="nx-toast"></div>
 
     <script src="data.js"></script>
+    <script src="offline_map.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -37,6 +37,19 @@ body {
   inset: 0;
 }
 
+/* Offline fallback: a self-contained Canvas2D schematic shown instead of
+   Cesium when Photorealistic 3D Tiles can't load (see offline_map.js). */
+#offlineMap {
+  position: absolute;
+  inset: 0;
+  background: var(--nx-base);
+}
+#offlineMap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 /* Hide Cesium's default credit clutter but keep the required attribution
    reachable via the small "data attribution" link. */
 .cesium-viewer-bottom {
@@ -97,6 +110,16 @@ body {
   border-radius: 100px;
   background: rgba(94, 234, 212, 0.12);
   border: 1px solid rgba(94, 234, 212, 0.3);
+}
+.nx-badge-offline {
+  color: var(--nx-amber);
+  background: rgba(255, 159, 10, 0.12);
+  border-color: rgba(255, 159, 10, 0.35);
+}
+.nx-badge-offline .nx-dot {
+  background: var(--nx-amber);
+  box-shadow: none;
+  animation: none;
 }
 .nx-dot {
   width: 8px;
