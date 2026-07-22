@@ -44,6 +44,8 @@ enum NexusGlyph {
   mapPinBase,
   motion,
   gear,
+  download,
+  trash,
 }
 
 /// A single bespoke stroke icon rendered with [CustomPainter].
@@ -191,6 +193,10 @@ class _NexusIconPainter extends CustomPainter {
         _paintMotion(canvas, rect);
       case NexusGlyph.gear:
         _paintGear(canvas, rect);
+      case NexusGlyph.download:
+        _paintDownload(canvas, rect);
+      case NexusGlyph.trash:
+        _paintTrash(canvas, rect);
     }
     canvas.restore();
   }
@@ -624,6 +630,65 @@ class _NexusIconPainter extends CustomPainter {
     }
     canvas.drawCircle(center, outerRadius, _stroke);
     canvas.drawCircle(center, r.width * 0.13, _stroke);
+  }
+
+  void _paintDownload(Canvas canvas, Rect r) {
+    // Down arrow into a tray.
+    canvas.drawLine(
+      Offset(r.center.dx, r.top + r.height * 0.12),
+      Offset(r.center.dx, r.center.dy + r.height * 0.12),
+      _stroke,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(r.center.dx - r.width * 0.16, r.center.dy - r.height * 0.04)
+        ..lineTo(r.center.dx, r.center.dy + r.height * 0.14)
+        ..lineTo(r.center.dx + r.width * 0.16, r.center.dy - r.height * 0.04),
+      _stroke,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(r.left + r.width * 0.2, r.bottom - r.height * 0.28)
+        ..lineTo(r.left + r.width * 0.2, r.bottom - r.height * 0.16)
+        ..lineTo(r.right - r.width * 0.2, r.bottom - r.height * 0.16)
+        ..lineTo(r.right - r.width * 0.2, r.bottom - r.height * 0.28),
+      _stroke,
+    );
+  }
+
+  void _paintTrash(Canvas canvas, Rect r) {
+    // Lid + handle.
+    canvas.drawLine(
+      Offset(r.left + r.width * 0.16, r.top + r.height * 0.26),
+      Offset(r.right - r.width * 0.16, r.top + r.height * 0.26),
+      _stroke,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(r.center.dx - r.width * 0.12, r.top + r.height * 0.26)
+        ..lineTo(r.center.dx - r.width * 0.1, r.top + r.height * 0.14)
+        ..lineTo(r.center.dx + r.width * 0.1, r.top + r.height * 0.14)
+        ..lineTo(r.center.dx + r.width * 0.12, r.top + r.height * 0.26),
+      _stroke,
+    );
+    // Can body.
+    canvas.drawPath(
+      Path()
+        ..moveTo(r.left + r.width * 0.24, r.top + r.height * 0.26)
+        ..lineTo(r.left + r.width * 0.3, r.bottom - r.height * 0.12)
+        ..lineTo(r.right - r.width * 0.3, r.bottom - r.height * 0.12)
+        ..lineTo(r.right - r.width * 0.24, r.top + r.height * 0.26),
+      _stroke,
+    );
+    // Vertical ribs.
+    for (var i = 0; i < 3; i++) {
+      final x = r.center.dx + (i - 1) * r.width * 0.12;
+      canvas.drawLine(
+        Offset(x, r.top + r.height * 0.38),
+        Offset(x, r.bottom - r.height * 0.22),
+        _stroke,
+      );
+    }
   }
 
   @override

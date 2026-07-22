@@ -45,6 +45,11 @@ dependencies:
   # including web.
   crypto: ^3.0.7
 
+  # App documents directory for offline movie downloads on native devices
+  # (see state/download_manager_io.dart). Already pulled in transitively via
+  # media_kit; pinned here so the direct import is explicit.
+  path_provider: ^2.1.5
+
   # Real video playback for the Media tab - the only Flutter player with
   # genuine parity across iOS/Android/macOS/web.
   media_kit: ^1.2.6

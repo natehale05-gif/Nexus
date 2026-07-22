@@ -181,6 +181,20 @@ Settings tab shows the scanned library's item counts and has a **Rescan
 Library** button (run it after adding/removing files - the library isn't
 watched automatically).
 
+**Offline downloads (native devices only).** On the native app builds
+(iOS/Android/macOS/Windows/Linux) each device can save a title for offline
+viewing: the download button on a Media-tab tile fetches the file to the
+app's own storage (`app/lib/state/download_manager_io.dart`), and it then
+plays from disk with no server or internet - it appears in a **Downloaded**
+section on the Media tab and can be removed there. Downloads are
+per-device local state, not synced through the server. This is inherently a
+native-device capability, so **the web / GitHub Pages build does not offer
+it** (a browser has no app-managed storage for large video to play back
+offline) - the download affordances simply don't appear there, while online
+streaming still works. To try offline downloads, run a native build (a
+phone, or `flutter run -d macos`), download a title, then stop the server
+or go offline and confirm it still plays.
+
 ## App -> server live mode
 
 The app defaults to local-demo-mode (`CompoundStore`), but it can also run

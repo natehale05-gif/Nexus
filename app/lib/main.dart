@@ -4,6 +4,8 @@ import 'state/compound_scope.dart';
 import 'state/compound_store.dart';
 import 'state/connection_scope.dart';
 import 'state/connection_settings.dart';
+import 'state/download_manager.dart';
+import 'state/download_scope.dart';
 import 'state/nexus_data_source.dart';
 import 'state/server_client.dart';
 import 'theme/app_theme.dart';
@@ -25,6 +27,7 @@ class NexusApp extends StatefulWidget {
 
 class _NexusAppState extends State<NexusApp> {
   final _settings = ConnectionSettings();
+  final _downloads = DownloadManager();
   late NexusDataSource _store = _createInitialDataSource();
   StoredConnection? _current;
 
@@ -52,6 +55,8 @@ class _NexusAppState extends State<NexusApp> {
   void initState() {
     super.initState();
     _loadPersistedConnection();
+    // Load any previously-downloaded titles (native only; a no-op on web).
+    _downloads.load();
   }
 
   Future<void> _loadPersistedConnection() async {
@@ -93,6 +98,7 @@ class _NexusAppState extends State<NexusApp> {
   @override
   void dispose() {
     _store.dispose();
+    _downloads.dispose();
     super.dispose();
   }
 
@@ -102,13 +108,16 @@ class _NexusAppState extends State<NexusApp> {
       current: _current,
       onConnect: _connect,
       onForget: _forget,
-      child: CompoundScope(
-        store: _store,
-        child: MaterialApp(
-          title: 'NEXUS',
-          debugShowCheckedModeBanner: false,
-          theme: buildNexusTheme(),
-          home: const RootShell(),
+      child: DownloadScope(
+        manager: _downloads,
+        child: CompoundScope(
+          store: _store,
+          child: MaterialApp(
+            title: 'NEXUS',
+            debugShowCheckedModeBanner: false,
+            theme: buildNexusTheme(),
+            home: const RootShell(),
+          ),
         ),
       ),
     );
