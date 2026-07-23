@@ -1,5 +1,9 @@
 import 'package:flutter/widgets.dart';
 
+import '../../ai/ai_provider.dart';
+import '../../ai/ai_settings.dart';
+import '../../ai/provider_registry.dart';
+import '../../state/ai_scope.dart';
 import '../../state/compound_scope.dart';
 import '../../state/connection_scope.dart';
 import '../../state/connection_settings.dart';
@@ -27,6 +31,17 @@ class _SettingsTabState extends State<SettingsTab> {
   final _tokenController = TextEditingController();
   final _addressFocusNode = FocusNode();
   final _tokenFocusNode = FocusNode();
+
+  // AI provider settings (see ai/).
+  final _aiModelController = TextEditingController();
+  final _aiKeyController = TextEditingController();
+  final _aiUrlController = TextEditingController();
+  final _aiModelFocus = FocusNode();
+  final _aiKeyFocus = FocusNode();
+  final _aiUrlFocus = FocusNode();
+  AiProviderKind _aiKind = AiProviderKind.local;
+  bool _aiSaved = false;
+
   bool _seeded = false;
   bool _busy = false;
   String? _error;
@@ -43,6 +58,24 @@ class _SettingsTabState extends State<SettingsTab> {
         _addressController.text = current.serverAddress;
         _tokenController.text = current.token;
       }
+      final ai = AiScope.of(context).config;
+      _aiKind = ai.kind;
+      _aiModelController.text = ai.model ?? '';
+      _seedAiCredentialFields(ai);
+    }
+  }
+
+  /// Populates the key/URL field for whichever provider is selected.
+  void _seedAiCredentialFields(AiConfig ai) {
+    switch (_aiKind) {
+      case AiProviderKind.macStudio:
+        _aiUrlController.text = ai.macStudioUrl ?? '';
+      case AiProviderKind.anthropic:
+        _aiKeyController.text = ai.anthropicKey ?? '';
+      case AiProviderKind.openai:
+        _aiKeyController.text = ai.openAiKey ?? '';
+      case AiProviderKind.local:
+        break;
     }
   }
 
@@ -52,7 +85,45 @@ class _SettingsTabState extends State<SettingsTab> {
     _tokenController.dispose();
     _addressFocusNode.dispose();
     _tokenFocusNode.dispose();
+    _aiModelController.dispose();
+    _aiKeyController.dispose();
+    _aiUrlController.dispose();
+    _aiModelFocus.dispose();
+    _aiKeyFocus.dispose();
+    _aiUrlFocus.dispose();
     super.dispose();
+  }
+
+  /// When the user switches provider in the picker, re-seed the credential
+  /// field from what's already stored for that provider.
+  void _selectAiKind(AiProviderKind kind, AiConfig stored) {
+    setState(() {
+      _aiKind = kind;
+      _aiSaved = false;
+      _aiKeyController.text = switch (kind) {
+        AiProviderKind.anthropic => stored.anthropicKey ?? '',
+        AiProviderKind.openai => stored.openAiKey ?? '',
+        _ => '',
+      };
+      _aiUrlController.text = kind == AiProviderKind.macStudio ? (stored.macStudioUrl ?? '') : '';
+    });
+  }
+
+  Future<void> _saveAi(ProviderRegistry registry) async {
+    final stored = registry.config;
+    final model = _aiModelController.text.trim();
+    final key = _aiKeyController.text.trim();
+    final url = _aiUrlController.text.trim();
+    await registry.update(AiConfig(
+      kind: _aiKind,
+      model: model.isEmpty ? null : model,
+      // Preserve the other provider's key even when it isn't the one being
+      // edited right now.
+      anthropicKey: _aiKind == AiProviderKind.anthropic ? key : stored.anthropicKey,
+      openAiKey: _aiKind == AiProviderKind.openai ? key : stored.openAiKey,
+      macStudioUrl: _aiKind == AiProviderKind.macStudio ? url : stored.macStudioUrl,
+    ));
+    if (mounted) setState(() => _aiSaved = true);
   }
 
   bool get _canConnect =>
@@ -91,9 +162,10 @@ class _SettingsTabState extends State<SettingsTab> {
   Widget build(BuildContext context) {
     final connectionScope = ConnectionScope.of(context);
     final store = CompoundScope.of(context);
+    final registry = AiScope.of(context);
 
     return AnimatedBuilder(
-      animation: store,
+      animation: Listenable.merge([store, registry]),
       builder: (context, _) {
         final (statusLabel, statusColor) = switch (store.connectionStatus) {
           ConnectionStatus.demo => ('Local Demo Mode', NexusColors.textMuted),
@@ -245,6 +317,8 @@ class _SettingsTabState extends State<SettingsTab> {
                         ),
                       ),
                     ],
+                    const SizedBox(height: 20),
+                    ..._aiSection(registry),
                   ],
                 ),
               ),
@@ -252,6 +326,122 @@ class _SettingsTabState extends State<SettingsTab> {
           ),
         );
       },
+    );
+  }
+
+  List<Widget> _aiSection(ProviderRegistry registry) {
+    final needsCredential = _aiKind != AiProviderKind.local;
+    final isKeyProvider = _aiKind == AiProviderKind.anthropic || _aiKind == AiProviderKind.openai;
+    return [
+      Text('AI Model', style: NexusText.footnote),
+      const SizedBox(height: 10),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Which backend answers in the NEXUS tab, on this device.', style: NexusText.subhead),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final kind in AiProviderKind.values)
+                  _AiProviderChip(
+                    label: kind.label,
+                    selected: kind == _aiKind,
+                    onTap: () => _selectAiKind(kind, registry.config),
+                  ),
+              ],
+            ),
+            if (_aiKind == AiProviderKind.local) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Runs entirely on this device, no network - great offline. '
+                '(Neural on-device models can slot in here later.)',
+                style: NexusText.footnote,
+              ),
+            ],
+            if (_aiKind == AiProviderKind.macStudio) ...[
+              const SizedBox(height: 16),
+              Text('Mac Studio URL', style: NexusText.footnote),
+              const SizedBox(height: 6),
+              _SettingsField(
+                controller: _aiUrlController,
+                focusNode: _aiUrlFocus,
+                onChanged: (_) => setState(() => _aiSaved = false),
+              ),
+              const SizedBox(height: 4),
+              Text('e.g. http://100.x.y.z:11434 (Tailscale) or http://192.168.1.50:11434', style: NexusText.footnote),
+            ],
+            if (isKeyProvider) ...[
+              const SizedBox(height: 16),
+              Text('${_aiKind.label} API key', style: NexusText.footnote),
+              const SizedBox(height: 6),
+              _SettingsField(
+                controller: _aiKeyController,
+                focusNode: _aiKeyFocus,
+                obscureText: true,
+                onChanged: (_) => setState(() => _aiSaved = false),
+              ),
+            ],
+            if (needsCredential) ...[
+              const SizedBox(height: 16),
+              Text('Model (optional - a sensible default is used if blank)', style: NexusText.footnote),
+              const SizedBox(height: 6),
+              _SettingsField(
+                controller: _aiModelController,
+                focusNode: _aiModelFocus,
+                onChanged: (_) => setState(() => _aiSaved = false),
+              ),
+            ],
+            const SizedBox(height: 20),
+            PressScale(
+              onTap: () => _saveAi(registry),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                decoration: BoxDecoration(color: NexusColors.blue, borderRadius: BorderRadius.circular(14)),
+                child: Center(
+                  child: Text(
+                    _aiSaved ? 'Saved' : 'Save AI Settings',
+                    style: NexusText.headline.copyWith(color: const Color(0xFFFFFFFF)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+}
+
+/// A pill for picking the active AI provider.
+class _AiProviderChip extends StatelessWidget {
+  const _AiProviderChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressScale(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? NexusColors.blue.withValues(alpha: 0.12) : NexusColors.secondarySurface,
+          borderRadius: BorderRadius.circular(NexusRadii.pill),
+          border: Border.all(color: selected ? NexusColors.blue : const Color(0x00000000), width: 1.4),
+        ),
+        child: Text(
+          label,
+          style: NexusText.bodyMedium.copyWith(color: selected ? NexusColors.blue : NexusColors.textPrimary),
+        ),
+      ),
     );
   }
 }

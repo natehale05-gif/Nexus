@@ -45,6 +45,11 @@ dependencies:
   # including web.
   crypto: ^3.0.7
 
+  # Cross-platform HTTP client for the multi-provider AI backends (streams
+  # SSE/NDJSON via Client.send). Already in the tree transitively; pinned
+  # here so the direct import in ai/ is explicit.
+  http: ^1.2.0
+
   # App documents directory for offline movie downloads on native devices
   # (see state/download_manager_io.dart). Already pulled in transitively via
   # media_kit; pinned here so the direct import is explicit.

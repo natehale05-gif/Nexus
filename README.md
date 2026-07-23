@@ -195,6 +195,39 @@ streaming still works. To try offline downloads, run a native build (a
 phone, or `flutter run -d macos`), download a title, then stop the server
 or go offline and confirm it still plays.
 
+## Multi-provider AI (NEXUS tab)
+
+The NEXUS AI tab routes chat through a pluggable provider abstraction
+(`app/lib/ai/`) so each device can pick its own backend, streamed token by
+token. `AiProvider.generate()` yields incremental text uniformly across four
+implementations:
+
+- **On-device** (`local`) - runs entirely on this device with no network,
+  backed today by NEXUS's built-in house-aware rule-based responder (a real
+  offline option). The same interface is designed to later host a neural
+  on-device model (llama.cpp / MLX) with no call-site changes.
+- **Mac Studio** (`mac_studio`) - a remote Ollama instance over a user-set
+  base URL (`http://<host>:11434`), reached over Tailscale. Streams Ollama's
+  NDJSON chat API.
+- **Anthropic** - `api.anthropic.com/v1/messages`, SSE streaming.
+- **OpenAI** - `api.openai.com/v1/chat/completions`, SSE streaming.
+
+Pick the provider/model per device under **Settings → AI Model**; API keys
+are stored with `flutter_secure_storage` (Keychain/Keystore/encrypted -
+never plain prefs), and the choice persists per device. Every provider gets
+the live compound context (buildings, lights, locks, grill, media, alerts…)
+as a system prompt, and `<action>` tags in replies execute device commands -
+so switching providers keeps the assistant house-aware and able to control
+things. Errors are surfaced per-backend (auth / timeout / unreachable /
+rate-limited) so it's obvious which one failed.
+
+**Web/Pages caveat:** browsers block direct calls to Anthropic/OpenAI (CORS,
+and shipping API keys into a browser is unsafe) and can't run on-device
+inference, so multi-provider AI is primarily a **native-app** feature; the
+existing server-routed Ollama path still answers on web. Provider request/
+response parsing and error mapping are unit-tested against fake streams
+(`app/test/ai_providers_test.dart`); live calls need real keys on a device.
+
 ## App -> server live mode
 
 The app defaults to local-demo-mode (`CompoundStore`), but it can also run

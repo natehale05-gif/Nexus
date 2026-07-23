@@ -1,7 +1,9 @@
 import 'package:flutter/widgets.dart';
+import '../../ai/actions.dart';
+import '../../ai/ai_message.dart';
+import '../../ai/ai_provider.dart';
 import '../../icons/nexus_icons.dart';
-import '../../state/compound_scope.dart';
-import '../../state/server_client.dart';
+import '../../state/ai_scope.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/press_scale.dart';
@@ -17,10 +19,11 @@ const _suggestions = [
   'Run movie mode',
 ];
 
-/// NEXUS AI tab (Section 5) - chat interface backed, in the real build, by
-/// a streaming Ollama completion endpoint with `<action>`-tag execution
-/// (Section 8). This demo stub uses [generateAssistantReply] against live
-/// compound state instead.
+/// NEXUS AI tab (Section 5) - a streaming chat interface routed through the
+/// active [ProviderRegistry] provider (on-device / Mac Studio Ollama /
+/// Anthropic / OpenAI, chosen in Settings). Replies stream token-by-token
+/// into a single bubble, and `<action>` tags in the reply execute device
+/// commands against the live store.
 class NexusAiTab extends StatefulWidget {
   const NexusAiTab({super.key});
 
@@ -44,28 +47,68 @@ class _NexusAiTabState extends State<NexusAiTab> {
   }
 
   void _send(String text) async {
-    if (text.trim().isEmpty || _typing) return;
-    final store = CompoundScope.of(context);
+    final trimmed = text.trim();
+    if (trimmed.isEmpty || _typing) return;
+    final registry = AiScope.of(context);
+
+    // Build the provider-facing history from the visible conversation so
+    // far (before adding this turn), then the new user turn.
+    final history = [
+      for (final m in _messages)
+        AiMessage(m.role == ChatRole.user ? AiRole.user : AiRole.assistant, m.text),
+      AiMessage(AiRole.user, trimmed),
+    ];
+
     setState(() {
-      _messages.add(ChatMessage(role: ChatRole.user, text: text.trim()));
+      _messages.add(ChatMessage(role: ChatRole.user, text: trimmed));
       _typing = true;
     });
     _textController.clear();
     _scrollToBottom();
 
-    // In live mode, the server's OllamaBridge answers (with the same
-    // local-heuristics fallback if Ollama itself isn't reachable);
-    // otherwise this demo's own rule-based responder handles it.
-    final reply = store is ServerClient
-        ? await store.sendChat(text)
-        : await Future.delayed(const Duration(milliseconds: 750), () => generateAssistantReply(text, store));
+    // Stream the reply through the active provider, appending deltas to a
+    // single assistant bubble so tokens render as they arrive. Action tags
+    // are stripped from the display and executed once the reply completes.
+    final buffer = StringBuffer();
+    var assistantIndex = -1;
 
-    if (!mounted) return;
-    setState(() {
-      _messages.add(ChatMessage(role: ChatRole.assistant, text: reply));
-      _typing = false;
-    });
-    _scrollToBottom();
+    void render() {
+      final visible = stripActionTags(buffer.toString());
+      setState(() {
+        if (assistantIndex == -1) {
+          _messages.add(ChatMessage(role: ChatRole.assistant, text: visible));
+          assistantIndex = _messages.length - 1;
+          _typing = false;
+        } else {
+          _messages[assistantIndex] = ChatMessage(role: ChatRole.assistant, text: visible);
+        }
+      });
+    }
+
+    try {
+      await for (final delta in registry.chat(history)) {
+        if (!mounted) return;
+        buffer.write(delta);
+        render();
+        _scrollToBottom();
+      }
+      registry.executeActions(buffer.toString());
+    } on AiException catch (e) {
+      if (!mounted) return;
+      buffer.clear();
+      buffer.write(e.displayMessage);
+      render();
+    } catch (e) {
+      if (!mounted) return;
+      buffer.clear();
+      buffer.write('Something went wrong: $e');
+      render();
+    } finally {
+      if (mounted) {
+        setState(() => _typing = false);
+        _scrollToBottom();
+      }
+    }
   }
 
   void _scrollToBottom() {
@@ -152,7 +195,7 @@ class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text('llama3.1:70b · Mac Studio', style: NexusText.footnote),
+                Text(AiScope.of(context).activeLabel, style: NexusText.footnote),
               ],
             ),
             const SizedBox(height: 28),

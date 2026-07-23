@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
+import 'ai/ai_settings.dart';
+import 'ai/provider_registry.dart';
+import 'state/ai_scope.dart';
 import 'state/compound_scope.dart';
 import 'state/compound_store.dart';
 import 'state/connection_scope.dart';
@@ -9,6 +12,7 @@ import 'state/download_scope.dart';
 import 'state/nexus_data_source.dart';
 import 'state/server_client.dart';
 import 'theme/app_theme.dart';
+import 'screens/nexus_ai/chat_engine.dart';
 import 'screens/root_shell.dart';
 
 void main() {
@@ -30,6 +34,17 @@ class _NexusAppState extends State<NexusApp> {
   final _downloads = DownloadManager();
   late NexusDataSource _store = _createInitialDataSource();
   StoredConnection? _current;
+
+  /// Multi-provider AI routing (on-device / Mac Studio / Anthropic / OpenAI).
+  /// The `storeOf`/`systemContext`/`localResponder` callbacks close over the
+  /// *current* store so the AI always sees live house state and can control
+  /// devices, even after a reconnect swaps [_store].
+  late final ProviderRegistry _ai = ProviderRegistry(
+    settings: AiSettings(),
+    storeOf: () => _store,
+    systemContext: () => buildSystemContext(_store.compound),
+    localResponder: (text) => generateAssistantReply(text, _store),
+  );
 
   /// Defaults to local-demo-mode ([CompoundStore]) exactly like the build
   /// order calls for ("wired to local state first, no server yet"), same
@@ -57,6 +72,8 @@ class _NexusAppState extends State<NexusApp> {
     _loadPersistedConnection();
     // Load any previously-downloaded titles (native only; a no-op on web).
     _downloads.load();
+    // Load this device's preferred AI provider/model + keys.
+    _ai.load();
   }
 
   Future<void> _loadPersistedConnection() async {
@@ -99,6 +116,7 @@ class _NexusAppState extends State<NexusApp> {
   void dispose() {
     _store.dispose();
     _downloads.dispose();
+    _ai.dispose();
     super.dispose();
   }
 
@@ -108,15 +126,18 @@ class _NexusAppState extends State<NexusApp> {
       current: _current,
       onConnect: _connect,
       onForget: _forget,
-      child: DownloadScope(
-        manager: _downloads,
-        child: CompoundScope(
-          store: _store,
-          child: MaterialApp(
-            title: 'NEXUS',
-            debugShowCheckedModeBanner: false,
-            theme: buildNexusTheme(),
-            home: const RootShell(),
+      child: AiScope(
+        registry: _ai,
+        child: DownloadScope(
+          manager: _downloads,
+          child: CompoundScope(
+            store: _store,
+            child: MaterialApp(
+              title: 'NEXUS',
+              debugShowCheckedModeBanner: false,
+              theme: buildNexusTheme(),
+              home: const RootShell(),
+            ),
           ),
         ),
       ),
