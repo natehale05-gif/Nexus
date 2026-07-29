@@ -12,15 +12,41 @@
 
 (function () {
   const params = new URLSearchParams(location.search);
+
+  // Ship no token by default. A Cesium ion token is tied to an ion account,
+  // and Photorealistic 3D Tiles have to be enabled on that account - so there
+  // is no token that can be committed here and work for everyone. Paste your
+  // own from https://ion.cesium.com/tokens (it needs the `assets:read` scope)
+  // via the app's Settings, the ?ionToken= URL parameter, or right here.
+  const DEFAULT_ION_TOKEN = '';
   const num = (key, fallback) => {
     const v = parseFloat(params.get(key));
     return Number.isFinite(v) ? v : fallback;
   };
 
+  // Cesium ion access token. Photorealistic 3D Tiles are served through ion,
+  // so without a token that carries the `assets:read` scope every tile
+  // request 401s and the globe never renders.
+  //
+  // Resolution order, so you can point this at your own ion account without
+  // rebuilding: ?ionToken=... in the URL > a token saved in localStorage (the
+  // app's Settings writes this) > the baked-in default below.
+  const storedToken = (() => {
+    try {
+      return window.localStorage.getItem('nexus.ionToken') || '';
+    } catch (e) {
+      return ''; // localStorage can throw in private mode / sandboxed frames.
+    }
+  })();
+  const ionToken = (params.get('ionToken') || storedToken || DEFAULT_ION_TOKEN).trim();
+
   window.NEXUS_CONFIG = {
-    // Public Cesium ion access token (client-side token, safe to embed).
-    ionToken:
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2NTU4ZTAyOS0wZWUxLTQzMjgtOTc1MS00M2ZjNTQ4ZGYyNDciLCJpZCI6NDM1MzM1LCJzdWIiOiJOSDEwMTIiLCJpc3MiOiJodHRwczovL2FwaS5jZXNpdW0uY29tIiwiYXVkIjoiTmV4dXMiLCJpYXQiOjE3ODQwNzIzNjN9.Oln_oUCjVEjcsl6Cspl_z5JfXJqOrHyz5LUqSrorgeM',
+    ionToken: ionToken,
+    ionTokenSource: params.get('ionToken')
+      ? 'url'
+      : storedToken
+        ? 'saved'
+        : 'default',
 
     // Compound geographic anchor (center of the 0..1 layout). Default sits on
     // flat Willamette Valley farmland just east of Corvallis, OR - matching

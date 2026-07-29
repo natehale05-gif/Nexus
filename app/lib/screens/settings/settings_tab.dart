@@ -7,6 +7,7 @@ import '../../state/ai_scope.dart';
 import '../../state/compound_scope.dart';
 import '../../state/connection_scope.dart';
 import '../../state/connection_settings.dart';
+import '../../state/map_settings.dart';
 import '../../state/nexus_data_source.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
@@ -36,6 +37,9 @@ class _SettingsTabState extends State<SettingsTab> {
   final _aiModelController = TextEditingController();
   final _aiKeyController = TextEditingController();
   final _aiUrlController = TextEditingController();
+  final _ionTokenController = TextEditingController();
+  final _ionTokenFocus = FocusNode();
+  bool _ionSaved = true;
   final _aiModelFocus = FocusNode();
   final _aiKeyFocus = FocusNode();
   final _aiUrlFocus = FocusNode();
@@ -62,6 +66,7 @@ class _SettingsTabState extends State<SettingsTab> {
       _aiKind = ai.kind;
       _aiModelController.text = ai.model ?? '';
       _seedAiCredentialFields(ai);
+      _ionTokenController.text = loadIonToken() ?? '';
     }
   }
 
@@ -91,6 +96,8 @@ class _SettingsTabState extends State<SettingsTab> {
     _aiModelFocus.dispose();
     _aiKeyFocus.dispose();
     _aiUrlFocus.dispose();
+    _ionTokenController.dispose();
+    _ionTokenFocus.dispose();
     super.dispose();
   }
 
@@ -318,6 +325,7 @@ class _SettingsTabState extends State<SettingsTab> {
                       ),
                     ],
                     const SizedBox(height: 20),
+                    ..._mapSection(),
                     ..._aiSection(registry),
                   ],
                 ),
@@ -327,6 +335,69 @@ class _SettingsTabState extends State<SettingsTab> {
         );
       },
     );
+  }
+
+  /// The 3D compound map is served by Cesium ion, which authorizes tile
+  /// requests per-account - so the token can't be shipped in the repo and has
+  /// to be pasted in per install. Hidden on platforms with no CesiumJS map.
+  List<Widget> _mapSection() {
+    if (!mapTokenConfigurable) return const [];
+    return [
+      Text('3D map', style: NexusText.footnote),
+      const SizedBox(height: 10),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'The Home map renders Google Photorealistic 3D Tiles through Cesium ion. '
+              'Tokens are tied to an ion account, so this one is yours to set.',
+              style: NexusText.subhead,
+            ),
+            const SizedBox(height: 14),
+            Text('Cesium ion access token', style: NexusText.footnote),
+            const SizedBox(height: 6),
+            _SettingsField(
+              controller: _ionTokenController,
+              focusNode: _ionTokenFocus,
+              obscureText: true,
+              onChanged: (_) => setState(() => _ionSaved = false),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Create one at ion.cesium.com/tokens with the default scopes (it must include '
+              'assets:read), and make sure Google Photorealistic 3D Tiles is added to that '
+              'account’s assets. Without a valid token the map falls back to the offline '
+              'schematic and tells you why.',
+              style: NexusText.footnote,
+            ),
+            const SizedBox(height: 20),
+            PressScale(
+              onTap: _saveIonToken,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                decoration: BoxDecoration(color: NexusColors.blue, borderRadius: BorderRadius.circular(14)),
+                child: Center(
+                  child: Text(
+                    _ionSaved ? 'Saved — reload to apply' : 'Save token',
+                    style: NexusText.headline.copyWith(color: const Color(0xFFFFFFFF)),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
+  void _saveIonToken() {
+    saveIonToken(_ionTokenController.text);
+    setState(() => _ionSaved = true);
   }
 
   List<Widget> _aiSection(ProviderRegistry registry) {

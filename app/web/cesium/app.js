@@ -51,20 +51,65 @@
   // same way - there's no attempt to tell "truly offline" apart from an ion
   // outage, since either way Photorealistic 3D Tiles just aren't available.
   let offlineActive = false;
-  function activateOfflineFallback() {
+  // `reason` distinguishes the causes that need different action from the
+  // user. Silently showing the schematic for all of them - which is what this
+  // used to do - makes a bad token look identical to a dropped connection,
+  // and leaves someone staring at a map wondering why the globe never
+  // appeared.
+  function activateOfflineFallback(reason) {
     offlineActive = true;
     const cesiumContainer = document.getElementById('cesiumContainer');
     if (cesiumContainer) cesiumContainer.style.display = 'none';
     if (window.NexusOfflineMap) window.NexusOfflineMap.activate();
     hideLoading();
-    showToast(
-      '<b>Running in offline mode.</b><br/>Photorealistic 3D Tiles aren’t reachable, so a simplified compound map is shown instead.',
-      6000
-    );
+
+    const messages = {
+      noToken:
+        '<b>No Cesium ion token set.</b><br/>The 3D globe needs one. Create a free token at ' +
+        '<a href="https://ion.cesium.com/tokens" target="_blank" rel="noopener">ion.cesium.com/tokens</a>, ' +
+        'then add it in Settings → 3D map. Showing the offline schematic meanwhile.',
+      badToken:
+        '<b>Cesium ion token rejected.</b><br/>It’s missing the <code>assets:read</code> scope, so tile ' +
+        'requests can’t be authorized. Create a new token at ' +
+        '<a href="https://ion.cesium.com/tokens" target="_blank" rel="noopener">ion.cesium.com/tokens</a> ' +
+        'with the default scopes and re-enter it in Settings → 3D map.',
+      tilesUnavailable:
+        '<b>Photorealistic 3D Tiles unavailable.</b><br/>The token works, but the tileset wouldn’t load. ' +
+        'Check that <i>Google Photorealistic 3D Tiles</i> is added to your ion account’s assets.',
+      offline:
+        '<b>Running in offline mode.</b><br/>Photorealistic 3D Tiles aren’t reachable, so a simplified ' +
+        'compound map is shown instead.',
+    };
+    // Token problems don't fix themselves, so leave those on screen.
+    const sticky = reason === 'noToken' || reason === 'badToken' || reason === 'tilesUnavailable';
+    showToast(messages[reason] || messages.offline, sticky ? 0 : 6000);
+  }
+
+  /// Reads the `scopes` claim out of an ion token without verifying its
+  /// signature - enough to tell "you pasted something that can't possibly work"
+  /// from "the network is down", which is the distinction that matters here.
+  function ionTokenProblem(token) {
+    if (!token || token.indexOf('REPLACE') !== -1) return 'noToken';
+    const parts = token.split('.');
+    if (parts.length !== 3) return 'badToken';
+    try {
+      const pad = parts[1] + '='.repeat((4 - (parts[1].length % 4)) % 4);
+      const payload = JSON.parse(
+        atob(pad.replace(/-/g, '+').replace(/_/g, '/'))
+      );
+      const scopes = payload.scopes;
+      if (!Array.isArray(scopes) || scopes.indexOf('assets:read') === -1) {
+        return 'badToken';
+      }
+      if (payload.exp && payload.exp * 1000 < Date.now()) return 'badToken';
+    } catch (e) {
+      return 'badToken';
+    }
+    return null;
   }
 
   window.addEventListener('offline', () => {
-    if (!offlineActive) activateOfflineFallback();
+    if (!offlineActive) activateOfflineFallback('offline');
   });
   window.addEventListener('online', () => {
     // Simplest reliable way back to the live 3D view - re-fetch everything
@@ -164,9 +209,13 @@
     if (window.self !== window.top) {
       document.body.classList.add('embedded');
     }
-    if (!cfg.ionToken || cfg.ionToken.indexOf('REPLACE') !== -1) {
-      console.warn('Missing Cesium ion token - falling back to the offline map.');
-      activateOfflineFallback();
+    const tokenProblem = ionTokenProblem(cfg.ionToken);
+    if (tokenProblem) {
+      console.warn(
+        'Cesium ion token unusable (' + tokenProblem + ', source: ' +
+          cfg.ionTokenSource + ') - falling back to the offline map.'
+      );
+      activateOfflineFallback(tokenProblem);
       return;
     }
     Cesium.Ion.defaultAccessToken = cfg.ionToken;
@@ -189,7 +238,7 @@
       });
     } catch (e) {
       console.warn('Failed to start CesiumJS, falling back to the offline map.', e);
-      activateOfflineFallback();
+      activateOfflineFallback('offline');
       return;
     }
 
@@ -224,7 +273,7 @@
     }
     if (!photoreal) {
       viewer.destroy();
-      activateOfflineFallback();
+      activateOfflineFallback('tilesUnavailable');
       return;
     }
 

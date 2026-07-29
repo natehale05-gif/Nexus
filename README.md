@@ -165,6 +165,15 @@ On the **web** build, the Home tab's map is a real 3D scene rendered with
 
 - **Google Photorealistic 3D Tiles** (real-world buildings + terrain) as the
   only base layer - there's no alternate terrain/imagery mode to switch to.
+
+> **The globe needs your own Cesium ion token.** ion authorizes tile requests
+> per account, so no token can be committed here that works for everyone.
+> Create one at [ion.cesium.com/tokens](https://ion.cesium.com/tokens) with
+> the default scopes (it must include `assets:read`), confirm *Google
+> Photorealistic 3D Tiles* is in that account's assets, then paste it into
+> **Settings → 3D map** and reload. Without it the map shows the offline
+> schematic and says exactly which of those steps is missing - it no longer
+> fails silently. `?ionToken=...` on the map URL also works for a quick test.
 - **Colored 3D compound buildings** - the Main House, Barn, Shop, Cabin, and
   Gates are extruded footprints colored by status (green = nominal, amber =
   attention, red = critical), with floating labels.
