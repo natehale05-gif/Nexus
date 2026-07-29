@@ -16,7 +16,9 @@ class LibraryScanner {
 
   final Directory root;
 
-  static const _extensions = {'.mp4', '.mkv', '.mov', '.m4v', '.avi', '.webm'};
+  static const _videoExtensions = {'.mp4', '.mkv', '.mov', '.m4v', '.avi', '.webm'};
+  static const _photoExtensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.bmp'};
+  static const _musicExtensions = {'.mp3', '.m4a', '.flac', '.wav', '.aac', '.ogg', '.opus'};
 
   static final _episodePattern = RegExp(r'[Ss](\d{1,2})[Ee](\d{1,3})');
   static final _yearPattern = RegExp(r'\((19|20)\d{2}\)|\b(19|20)\d{2}\b');
@@ -27,11 +29,36 @@ class LibraryScanner {
     await for (final entity in root.list(recursive: true, followLinks: false)) {
       if (entity is! File) continue;
       final ext = p.extension(entity.path).toLowerCase();
-      if (!_extensions.contains(ext)) continue;
+      if (_photoExtensions.contains(ext)) {
+        items.add(_simpleEntry(entity, LibraryItemKind.photo));
+        continue;
+      }
+      if (_musicExtensions.contains(ext)) {
+        // Music needs a real duration for the player's scrubber; photos
+        // don't, so only pay the ffprobe cost here.
+        items.add(_simpleEntry(entity, LibraryItemKind.music,
+            durationSeconds: await probeDurationSeconds(entity.path)));
+        continue;
+      }
+      if (!_videoExtensions.contains(ext)) continue;
       final durationSeconds = await probeDurationSeconds(entity.path);
       items.add(_parse(entity, durationSeconds));
     }
     return items;
+  }
+
+  /// Photos and music: title from the filename, "subtitle" from the folder
+  /// it lives in (which is usually the album, or the shoot/event).
+  LibraryItem _simpleEntry(File file, LibraryItemKind kind, {double durationSeconds = 0}) {
+    final relative = p.relative(file.path, from: root.path);
+    return LibraryItem(
+      id: sha256.convert(utf8.encode(relative)).toString().substring(0, 16),
+      path: file.path,
+      title: _cleanTitle(p.basenameWithoutExtension(file.path)),
+      kind: kind,
+      durationSeconds: durationSeconds,
+      showTitle: p.dirname(relative) == '.' ? null : _cleanTitle(p.basename(p.dirname(file.path))),
+    );
   }
 
   LibraryItem _parse(File file, double durationSeconds) {

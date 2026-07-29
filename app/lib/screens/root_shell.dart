@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
+import 'buildings/buildings_tab.dart';
 import 'home/home_tab.dart';
 import 'security/security_tab.dart';
 import 'media/media_tab.dart';
@@ -25,6 +26,8 @@ class _RootShellState extends State<RootShell> {
     switch (tab) {
       case NexusTab.home:
         return const HomeTab();
+      case NexusTab.buildings:
+        return const BuildingsTab();
       case NexusTab.security:
         return const SecurityTab();
       case NexusTab.media:

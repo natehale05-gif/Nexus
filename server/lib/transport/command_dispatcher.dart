@@ -90,6 +90,8 @@ class CommandDispatcher {
       server.mutate(() {
         server.compound.mediaStats = library.stats();
         server.compound.continueWatching = library.continueWatching(server.compound.playbackPositions);
+        server.compound.photos = library.photos();
+        server.compound.music = library.music();
       });
     });
   }

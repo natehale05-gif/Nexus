@@ -45,6 +45,12 @@ Future<void> main(List<String> args) async {
   await library.rescan();
   server.compound.mediaStats = library.stats();
   server.compound.continueWatching = library.continueWatching(server.compound.playbackPositions);
+  server.compound.photos = library.photos();
+  server.compound.music = library.music();
+  // Cameras come from NEXUS_CAMERAS, so the app renders what's actually
+  // configured rather than a built-in list.
+  server.compound.cameras = config.cameras;
+  log('${config.cameras.length} camera(s) configured', name: 'nexus.server');
   log('found ${library.items.length} media item(s)', name: 'nexus.server');
 
   final dispatcher = CommandDispatcher(server, integrations, library);

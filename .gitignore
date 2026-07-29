@@ -27,3 +27,7 @@ doc/api/
 
 .flutter-plugins
 .flutter-plugins-dependencies
+
+# Repo tooling (icon generator) build artifacts
+tool/.dart_tool/
+tool/pubspec.lock

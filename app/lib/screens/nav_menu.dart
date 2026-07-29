@@ -10,7 +10,7 @@ import '../widgets/press_scale.dart';
 
 /// The top-level sections. Navigation moved from a bottom tab bar to a
 /// single Apple-style pop-up menu in the top-right (see [NexusMenuButton]).
-enum NexusTab { home, security, media, nexusAi, settings }
+enum NexusTab { home, buildings, security, media, nexusAi, settings }
 
 class NexusTabSpec {
   const NexusTabSpec(this.tab, this.label, this.glyph);
@@ -21,6 +21,7 @@ class NexusTabSpec {
 
 const List<NexusTabSpec> nexusTabs = [
   NexusTabSpec(NexusTab.home, 'Home', NexusGlyph.mapPinBase),
+  NexusTabSpec(NexusTab.buildings, 'Buildings', NexusGlyph.gate),
   NexusTabSpec(NexusTab.security, 'Security', NexusGlyph.camera),
   NexusTabSpec(NexusTab.media, 'Media', NexusGlyph.tv),
   NexusTabSpec(NexusTab.nexusAi, 'NEXUS', NexusGlyph.sparkle),

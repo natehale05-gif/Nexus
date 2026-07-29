@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:nexus_shared/nexus_shared.dart';
+
 /// Server configuration, overridable via environment variables so a real
 /// deployment (e.g. a launchd/systemd service) isn't stuck with the
 /// hardcoded bind address/ports/data location. All are optional - the
@@ -11,6 +13,7 @@ class ServerConfig {
     required this.restPort,
     required this.dataDir,
     required this.mediaRoot,
+    required this.cameras,
   });
 
   factory ServerConfig.fromEnvironment() {
@@ -22,7 +25,32 @@ class ServerConfig {
       restPort: int.tryParse(env['NEXUS_REST_PORT'] ?? '') ?? 8766,
       dataDir: dataDir,
       mediaRoot: env['NEXUS_MEDIA_ROOT'] ?? '$dataDir/media',
+      cameras: parseCameras(env['NEXUS_CAMERAS']),
     );
+  }
+
+  /// Parses `NEXUS_CAMERAS`: a comma-separated list of `Name=streamUrl`
+  /// pairs, e.g.
+  ///   NEXUS_CAMERAS="Front Door=http://go2rtc:1984/api/stream.m3u8?src=front,Barn=..."
+  /// A bare `Name` (no `=`) registers a camera with no stream yet, which
+  /// the app shows as configured-but-not-streaming rather than hiding.
+  static List<Camera> parseCameras(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return const [];
+    final cameras = <Camera>[];
+    for (final part in raw.split(',')) {
+      final entry = part.trim();
+      if (entry.isEmpty) continue;
+      final split = entry.indexOf('=');
+      final name = (split == -1 ? entry : entry.substring(0, split)).trim();
+      final url = split == -1 ? null : entry.substring(split + 1).trim();
+      if (name.isEmpty) continue;
+      cameras.add(Camera(
+        id: 'cam_${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_')}',
+        name: name,
+        streamUrl: (url == null || url.isEmpty) ? null : url,
+      ));
+    }
+    return cameras;
   }
 
   final String bindAddress;
@@ -35,6 +63,9 @@ class ServerConfig {
   /// `media/` folder inside the data dir, which will just be empty until
   /// configured.
   final String mediaRoot;
+
+  /// Security cameras declared via `NEXUS_CAMERAS` (see [parseCameras]).
+  final List<Camera> cameras;
 
   File get pairingTokenFile => File('$dataDir/pairing_token');
   File get snapshotFile => File('$dataDir/state.json');

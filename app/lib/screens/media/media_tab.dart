@@ -98,6 +98,22 @@ class _MediaTabState extends State<MediaTab> {
                         ],
                       ),
                     ],
+                    if (compound.photos.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text('Photos', style: NexusText.footnote),
+                      const SizedBox(height: 10),
+                      _PhotoGrid(photos: compound.photos, store: store),
+                    ],
+                    if (compound.music.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text('Music', style: NexusText.footnote),
+                      const SizedBox(height: 10),
+                      _MusicList(
+                        tracks: compound.music,
+                        store: store,
+                        onPlay: (entry) => _playStreaming(entry.id, store),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     Text('Continue Watching', style: NexusText.footnote),
                     const SizedBox(height: 10),
@@ -247,7 +263,11 @@ class _NowPlayingCardState extends State<_NowPlayingCard> {
   @override
   Widget build(BuildContext context) {
     final nowPlaying = widget.nowPlaying;
-    final controller = _controller;
+    // Audio tracks play through the same player but have no picture, so
+    // they keep the compact artwork-style header instead of a black
+    // 16:9 video surface.
+    final isAudio = widget.store.compound.music.any((m) => m.id == nowPlaying.itemId);
+    final controller = isAudio ? null : _controller;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
@@ -500,6 +520,173 @@ class _ProgressRingPainter extends CustomPainter {
   bool shouldRepaint(covariant _ProgressRingPainter oldDelegate) => oldDelegate.progress != progress;
 }
 
+/// Photos as a square thumbnail grid, loaded straight from the server's
+/// media stream endpoint (same per-item token as video). Tapping one opens
+/// it full-screen.
+class _PhotoGrid extends StatelessWidget {
+  const _PhotoGrid({required this.photos, required this.store});
+
+  final List<LibraryEntry> photos;
+  final NexusDataSource store;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      children: [
+        for (final photo in photos)
+          PressScale(
+            onTap: () => _openViewer(context, photo),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: _PhotoThumb(uri: store.mediaStreamUri(photo.id)),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _openViewer(BuildContext context, LibraryEntry photo) {
+    final uri = store.mediaStreamUri(photo.id);
+    if (uri == null) return;
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: const Color(0xE6000000),
+        pageBuilder: (context, _, _) => _PhotoViewer(title: photo.title, uri: uri),
+      ),
+    );
+  }
+}
+
+class _PhotoThumb extends StatelessWidget {
+  const _PhotoThumb({required this.uri});
+
+  final Uri? uri;
+
+  @override
+  Widget build(BuildContext context) {
+    if (uri == null) {
+      // Local-demo-mode: no server to fetch from.
+      return Container(
+        color: NexusColors.secondarySurface,
+        child: Center(child: NexusIcon(NexusGlyph.tv, size: 18, color: NexusColors.textFaint)),
+      );
+    }
+    return Image.network(
+      uri.toString(),
+      fit: BoxFit.cover,
+      errorBuilder: (context, _, _) => Container(
+        color: NexusColors.secondarySurface,
+        child: Center(child: NexusIcon(NexusGlyph.close, size: 16, color: NexusColors.textFaint)),
+      ),
+      loadingBuilder: (context, child, progress) =>
+          progress == null ? child : Container(color: NexusColors.secondarySurface),
+    );
+  }
+}
+
+/// Full-screen photo, tap anywhere to dismiss.
+class _PhotoViewer extends StatelessWidget {
+  const _PhotoViewer({required this.title, required this.uri});
+
+  final String title;
+  final Uri uri;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.of(context).maybePop(),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                title,
+                style: NexusText.headline.copyWith(color: const Color(0xFFFFFFFF)),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            Expanded(child: Center(child: Image.network(uri.toString(), fit: BoxFit.contain))),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('Tap to close', style: NexusText.footnote),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Music tracks as a tappable list - playback runs through the same player
+/// as video (audio-only media just renders no video surface).
+class _MusicList extends StatelessWidget {
+  const _MusicList({required this.tracks, required this.store, required this.onPlay});
+
+  final List<LibraryEntry> tracks;
+  final NexusDataSource store;
+  final ValueChanged<LibraryEntry> onPlay;
+
+  String _duration(double seconds) {
+    if (seconds <= 0) return '';
+    final total = seconds.round();
+    final minutes = total ~/ 60;
+    final secs = (total % 60).toString().padLeft(2, '0');
+    return '$minutes:$secs';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+      child: Column(
+        children: [
+          for (var i = 0; i < tracks.length; i++) ...[
+            if (i > 0) Container(height: 1, color: NexusColors.separator),
+            PressScale(
+              onTap: () => onPlay(tracks[i]),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  children: [
+                    NexusIcon(NexusGlyph.playFill, size: 14, color: NexusColors.purple),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(tracks[i].title,
+                              style: NexusText.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          if ((tracks[i].subtitle ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(tracks[i].subtitle!,
+                                style: NexusText.footnote, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(_duration(tracks[i].durationSeconds), style: NexusText.footnote),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _StatsRow extends StatelessWidget {
   const _StatsRow({required this.stats});
 
@@ -507,13 +694,24 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(child: _StatCell(value: stats.movieCount, label: 'Movies')),
-        Expanded(child: _StatCell(value: stats.showCount, label: 'Shows')),
-        Expanded(child: _StatCell(value: stats.episodeCount, label: 'Episodes')),
-      ],
-    );
+    // Movies/Shows/Episodes always; Photos/Music only once the library has
+    // some, so the row doesn't get cramped with zeroes.
+    final cells = <Widget>[
+      _StatCell(value: stats.movieCount, label: 'Movies'),
+      _StatCell(value: stats.showCount, label: 'Shows'),
+      _StatCell(value: stats.episodeCount, label: 'Episodes'),
+      if (stats.photoCount > 0) _StatCell(value: stats.photoCount, label: 'Photos'),
+      if (stats.trackCount > 0) _StatCell(value: stats.trackCount, label: 'Tracks'),
+    ];
+    return LayoutBuilder(builder: (context, constraints) {
+      // Three per row, wrapping to a second row when photos/music appear.
+      final width = (constraints.maxWidth - 2 * 8) / 3;
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [for (final cell in cells) SizedBox(width: width, child: cell)],
+      );
+    });
   }
 }
 
@@ -526,7 +724,6 @@ class _StatCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
       child: Column(

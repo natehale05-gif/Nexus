@@ -114,6 +114,22 @@ class RestApi {
     '.mkv': 'video/x-matroska',
     '.avi': 'video/x-msvideo',
     '.webm': 'video/webm',
+    // Photos
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.heic': 'image/heic',
+    '.bmp': 'image/bmp',
+    // Music
+    '.mp3': 'audio/mpeg',
+    '.m4a': 'audio/mp4',
+    '.flac': 'audio/flac',
+    '.wav': 'audio/wav',
+    '.aac': 'audio/aac',
+    '.ogg': 'audio/ogg',
+    '.opus': 'audio/opus',
   };
 
   String _contentTypeFor(String path) {

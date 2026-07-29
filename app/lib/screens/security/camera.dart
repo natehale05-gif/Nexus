@@ -1,16 +1,15 @@
-/// Demo camera metadata for the Security tab's grid (Section 5). Real
-/// build: populated from Frigate's camera list (Section 8).
-class SecurityCamera {
-  const SecurityCamera({required this.name, required this.hasMotion});
-  final String name;
-  final bool hasMotion;
-}
+import 'package:nexus_shared/nexus_shared.dart';
 
-const demoCameras = [
-  SecurityCamera(name: 'Front Door', hasMotion: false),
-  SecurityCamera(name: 'Barn North', hasMotion: true),
-  SecurityCamera(name: 'Driveway', hasMotion: false),
-  SecurityCamera(name: 'Shop Bay', hasMotion: false),
-  SecurityCamera(name: 'Cabin Trail', hasMotion: false),
-  SecurityCamera(name: 'East Gate', hasMotion: false),
+/// Cameras shown in local-demo-mode, so the Security tab has something
+/// representative before a real server is paired. A live server replaces
+/// these wholesale with whatever `NEXUS_CAMERAS` declares (see
+/// `server/lib/config.dart`) - none of these have a stream URL, so they
+/// render as "no stream configured" rather than pretending to be live.
+final List<Camera> demoCameras = [
+  Camera(id: 'cam_front_door', name: 'Front Door', buildingId: 'main'),
+  Camera(id: 'cam_barn_north', name: 'Barn North', buildingId: 'barn', hasMotion: true),
+  Camera(id: 'cam_driveway', name: 'Driveway', buildingId: 'main'),
+  Camera(id: 'cam_shop_bay', name: 'Shop Bay', buildingId: 'shop'),
+  Camera(id: 'cam_cabin_trail', name: 'Cabin Trail', buildingId: 'cabin'),
+  Camera(id: 'cam_east_gate', name: 'East Gate', buildingId: 'ge'),
 ];

@@ -111,7 +111,8 @@ state look identical at boot.
 | `NEXUS_WS_PORT` | `8765` | WebSocket state-sync port |
 | `NEXUS_REST_PORT` | `8766` | REST API port |
 | `NEXUS_DATA_DIR` | `~/.nexus` | Where the pairing token and state snapshot live |
-| `NEXUS_MEDIA_ROOT` | `$NEXUS_DATA_DIR/media` | Folder the media library scanner walks for movies/TV |
+| `NEXUS_MEDIA_ROOT` | `$NEXUS_DATA_DIR/media` | Folder the media library scanner walks for movies/TV/photos/music |
+| `NEXUS_CAMERAS` | _(none)_ | Security cameras, `Name=streamUrl` comma-separated (see **Security cameras**) |
 
 **State persistence.** The server snapshots its compound state to
 `$NEXUS_DATA_DIR/state.json` a few seconds after every change (and once
@@ -159,11 +160,21 @@ Two exceptions are real:
 
 ### Media library (replacing Jellyfin)
 
-`server/lib/media/` scans `NEXUS_MEDIA_ROOT` for `.mp4`/`.mkv`/`.mov`/`.m4v`/
-`.avi`/`.webm` files (recursively), derives titles/years/episode numbers
-from file and folder names (no metadata service like TMDB - results are
-heuristic, not perfect), and serves them with real HTTP range-request
-support at `GET /media/stream/<id>` so seeking works in the app's player.
+`server/lib/media/` scans `NEXUS_MEDIA_ROOT` recursively and classifies
+every file it recognizes by extension:
+
+| Kind | Extensions | Where it shows up |
+|---|---|---|
+| Movies / TV | `.mp4 .mkv .mov .m4v .avi .webm` | Now Playing + Continue Watching |
+| Photos | `.jpg .jpeg .png .gif .webp .heic .bmp` | Media tab → **Photos** grid (tap for full screen) |
+| Music | `.mp3 .m4a .flac .wav .aac .ogg .opus` | Media tab → **Music** list (plays as audio) |
+
+Titles/years/episode numbers are derived from file and folder names (no
+metadata service like TMDB - results are heuristic, not perfect); a photo
+or track's parent folder becomes its subtitle, so `Photos/Barn Raising/
+DSC_0001.jpg` reads as "DSC 0001 · Barn Raising". Everything is served with
+real HTTP range-request support at `GET /media/stream/<id>` so seeking
+works in the app's player.
 
 **Requires `ffprobe`** (part of [ffmpeg](https://ffmpeg.org)) on the host to
 read file durations - install it and make sure it's on `PATH` before
@@ -194,6 +205,40 @@ offline) - the download affordances simply don't appear there, while online
 streaming still works. To try offline downloads, run a native build (a
 phone, or `flutter run -d macos`), download a title, then stop the server
 or go offline and confirm it still plays.
+
+### Security cameras
+
+Cameras are declared server-side via `NEXUS_CAMERAS` as a comma-separated
+list of `Name=streamUrl` pairs, and pushed to every client as part of the
+compound - so the Security tab renders what you actually have rather than a
+built-in list:
+
+```bash
+NEXUS_CAMERAS="Front Door=http://go2rtc.local:1984/api/stream.m3u8?src=front,Barn North=...,Shop Bay"
+```
+
+Tapping a camera with a stream URL plays it inline. A bare name (no `=`)
+registers the camera but marks it **NO STREAM**, and says so when tapped,
+rather than dead-ending on a tile that looks live.
+
+**Use HLS (`.m3u8`) URLs.** NEXUS doesn't speak RTSP itself - put
+[go2rtc](https://github.com/AlexxIT/go2rtc) (or similar) in front of your
+RTSP/UniFi Protect cameras and point `NEXUS_CAMERAS` at its HLS endpoints.
+That keeps the streaming concern in a tool built for it instead of
+reimplementing RTSP in the app.
+
+## Buildings tab (compound control)
+
+Each building on the compound gets a tab (a pill in the horizontal selector,
+with a status dot so problems are visible without switching). Selecting one
+shows that building's summary (rooms, device count, mesh health), its
+building-level **Locks & Gates**, then every **room as a room-widget card**
+containing each device in that room - lights, climate, grills, media, and
+room-scoped locks. Rooms with no devices still appear, so nothing is
+silently missing.
+
+The Home map remains the spatial view (where things are); Buildings is the
+working view (operating a building room by room).
 
 ## Multi-provider AI (NEXUS tab)
 

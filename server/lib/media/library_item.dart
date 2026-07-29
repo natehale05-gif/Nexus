@@ -1,7 +1,8 @@
-/// A single scanned movie or TV episode file. Server-side only - the app
-/// never sees this directly, only the [ContinueWatchingItem]/[NowPlaying]
-/// (from `nexus_shared`) built from it, referencing it by [id].
-enum LibraryItemKind { movie, episode }
+/// A single scanned library file - a movie, TV episode, photo, or music
+/// track. Server-side only: the app sees the `nexus_shared` projections
+/// ([ContinueWatchingItem]/[NowPlaying]/[LibraryEntry]) built from these,
+/// referencing them by [id].
+enum LibraryItemKind { movie, episode, photo, music }
 
 class LibraryItem {
   LibraryItem({

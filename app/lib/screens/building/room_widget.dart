@@ -5,15 +5,23 @@ import '../../theme/tokens.dart';
 import 'device_rows/climate_row.dart';
 import 'device_rows/grill_row.dart';
 import 'device_rows/light_row.dart';
+import 'device_rows/lock_row.dart';
 import 'device_rows/media_row.dart';
 
-/// Room widget card (Section 3): header row with inline badges, then
-/// device rows in order - light, climate, grill, then any other type.
+/// Room widget card (Section 3): header row with inline badges, then a row
+/// for every device assigned to this room - lights, climate, grills, media,
+/// and any room-scoped lock (building-level locks/gates stay in the
+/// building's own Locks & Gates section, since they aren't in a room).
 class RoomWidget extends StatelessWidget {
-  const RoomWidget({super.key, required this.room, required this.devices});
+  const RoomWidget({super.key, required this.room, required this.devices, this.showEmpty = false});
 
   final Room room;
   final List<Device> devices;
+
+  /// When true, a room with no devices still renders (as an empty card)
+  /// instead of vanishing - used by the Buildings tab so every room in a
+  /// building is visible and accounted for.
+  final bool showEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +29,7 @@ class RoomWidget extends StatelessWidget {
     final climates = devices.whereType<ClimateDevice>().toList();
     final grills = devices.whereType<GrillDevice>().toList();
     final media = devices.whereType<MediaDevice>().toList();
+    final locks = devices.whereType<LockDevice>().toList();
 
     final lightsOn = lights.where((l) => l.on).length;
     final grillOn = grills.any((g) => g.on);
@@ -30,9 +39,10 @@ class RoomWidget extends StatelessWidget {
       for (final c in climates) ClimateRow(device: c),
       for (final g in grills) GrillRow(device: g),
       for (final m in media) MediaRow(device: m),
+      for (final l in locks) LockRow(device: l),
     ];
 
-    if (rows.isEmpty) return const SizedBox.shrink();
+    if (rows.isEmpty && !showEmpty) return const SizedBox.shrink();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -61,6 +71,11 @@ class RoomWidget extends StatelessWidget {
               ],
             ),
           ),
+          if (rows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, bottom: 10),
+              child: Text('No devices in this room yet', style: NexusText.footnote),
+            ),
           for (var i = 0; i < rows.length; i++) ...[
             if (i > 0) const _RowDivider(),
             rows[i],

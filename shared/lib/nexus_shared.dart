@@ -5,6 +5,7 @@ library nexus_shared;
 
 export 'src/alert.dart';
 export 'src/building.dart';
+export 'src/camera.dart';
 export 'src/compound.dart';
 export 'src/demo_seed.dart';
 export 'src/device.dart';

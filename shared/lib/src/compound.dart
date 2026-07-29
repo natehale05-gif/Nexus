@@ -1,5 +1,6 @@
 import 'alert.dart';
 import 'building.dart';
+import 'camera.dart';
 import 'device.dart';
 import 'insight.dart';
 import 'media.dart';
@@ -24,9 +25,15 @@ class Compound {
     NowPlaying? nowPlaying,
     MediaLibraryStats? mediaStats,
     List<ContinueWatchingItem>? continueWatching,
+    List<LibraryEntry>? photos,
+    List<LibraryEntry>? music,
+    List<Camera>? cameras,
     Map<String, double>? playbackPositions,
     WeatherInfo? weather,
   })  : insights = insights ?? [],
+        photos = photos ?? [],
+        music = music ?? [],
+        cameras = cameras ?? [],
         nowPlaying = nowPlaying,
         mediaStats = mediaStats ??
             MediaLibraryStats(movieCount: 0, showCount: 0, episodeCount: 0),
@@ -45,6 +52,14 @@ class Compound {
   NowPlaying? nowPlaying;
   MediaLibraryStats mediaStats;
   List<ContinueWatchingItem> continueWatching;
+
+  /// Scanned photos and music tracks (movies/TV surface through
+  /// [continueWatching]/[nowPlaying] instead).
+  List<LibraryEntry> photos;
+  List<LibraryEntry> music;
+
+  /// Security cameras, configured server-side.
+  List<Camera> cameras;
 
   /// Playback position (seconds) per library item id - the persisted source
   /// of truth for "where did I leave off," survives server restarts and
@@ -96,6 +111,9 @@ class Compound {
         'nowPlaying': nowPlaying?.toJson(),
         'mediaStats': mediaStats.toJson(),
         'continueWatching': continueWatching.map((c) => c.toJson()).toList(),
+        'photos': photos.map((p) => p.toJson()).toList(),
+        'music': music.map((m) => m.toJson()).toList(),
+        'cameras': cameras.map((c) => c.toJson()).toList(),
         'playbackPositions': playbackPositions,
         'weather': weather?.toJson(),
       };
@@ -134,6 +152,15 @@ class Compound {
                 json['mediaStats'] as Map<String, dynamic>),
         continueWatching: (json['continueWatching'] as List? ?? [])
             .map((e) => ContinueWatchingItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        photos: (json['photos'] as List? ?? [])
+            .map((e) => LibraryEntry.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        music: (json['music'] as List? ?? [])
+            .map((e) => LibraryEntry.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        cameras: (json['cameras'] as List? ?? [])
+            .map((e) => Camera.fromJson(e as Map<String, dynamic>))
             .toList(),
         playbackPositions: (json['playbackPositions'] as Map?)
                 ?.map((k, v) => MapEntry(k as String, (v as num).toDouble())) ??

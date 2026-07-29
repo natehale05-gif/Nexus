@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:nexus_shared/nexus_shared.dart';
 import '../../icons/nexus_icons.dart';
 import '../../state/compound_scope.dart';
@@ -37,6 +41,9 @@ class _SecurityTabState extends State<SecurityTab> {
       builder: (context, _) {
         final alerts = store.compound.alerts.where((a) => a.level != Level.info).toList()
           ..sort((a, b) => b.time.compareTo(a.time));
+        // Whatever the paired server declares via NEXUS_CAMERAS; the demo
+        // list only stands in when running with no server.
+        final cameras = store.compound.cameras.isNotEmpty ? store.compound.cameras : demoCameras;
 
         return Container(
           color: NexusColors.background,
@@ -67,12 +74,12 @@ class _SecurityTabState extends State<SecurityTab> {
                       crossAxisSpacing: 12,
                       childAspectRatio: 1.25,
                       children: [
-                        for (final camera in demoCameras)
+                        for (final camera in cameras)
                           _CameraTile(
                             camera: camera,
-                            expanded: _expandedCamera == camera.name,
+                            expanded: _expandedCamera == camera.id,
                             onTap: () => setState(
-                              () => _expandedCamera = _expandedCamera == camera.name ? null : camera.name,
+                              () => _expandedCamera = _expandedCamera == camera.id ? null : camera.id,
                             ),
                           ),
                       ],
@@ -131,27 +138,78 @@ class _AlertCard extends StatelessWidget {
   }
 }
 
-class _CameraTile extends StatelessWidget {
+/// A camera tile. When the server has a stream URL configured for this
+/// camera, tapping it plays the live feed inline; otherwise it says so
+/// plainly rather than dead-ending.
+class _CameraTile extends StatefulWidget {
   const _CameraTile({required this.camera, required this.expanded, required this.onTap});
 
-  final SecurityCamera camera;
+  final Camera camera;
   final bool expanded;
   final VoidCallback onTap;
 
   @override
+  State<_CameraTile> createState() => _CameraTileState();
+}
+
+class _CameraTileState extends State<_CameraTile> {
+  Player? _player;
+  VideoController? _controller;
+
+  @override
+  void didUpdateWidget(covariant _CameraTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.expanded && widget.camera.isStreamable) {
+      _startStream();
+    } else if (!widget.expanded) {
+      _stopStream();
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopStream();
+    super.dispose();
+  }
+
+  void _startStream() {
+    if (_player != null) return;
+    final player = Player();
+    unawaited(player.open(Media(widget.camera.streamUrl!)));
+    setState(() {
+      _player = player;
+      _controller = VideoController(player);
+    });
+  }
+
+  void _stopStream() {
+    final player = _player;
+    _player = null;
+    _controller = null;
+    if (player != null) unawaited(player.dispose());
+  }
+
+  static const _tileWhite = Color(0xFFFFFFFF);
+
+  @override
   Widget build(BuildContext context) {
+    final camera = widget.camera;
+    final controller = _controller;
     return PressScale(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: const Color(0xFF17181C),
+          color: NexusColors.mapBaseDeep,
           borderRadius: BorderRadius.circular(NexusRadii.card),
         ),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Center(child: NexusIcon(NexusGlyph.camera, size: 26, color: const Color(0xFFFFFFFF).withValues(alpha: 0.24))),
+            if (controller != null)
+              Video(controller: controller, controls: NoVideoControls, fit: BoxFit.cover)
+            else
+              Center(child: NexusIcon(NexusGlyph.camera, size: 26, color: _tileWhite.withValues(alpha: 0.24))),
             Positioned(
               left: 8,
               top: 8,
@@ -162,17 +220,17 @@ class _CameraTile extends StatelessWidget {
                     height: 6,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: camera.hasMotion ? NexusColors.red : NexusColors.green,
+                      color: camera.hasMotion
+                          ? NexusColors.red
+                          : (camera.isStreamable ? NexusColors.green : NexusColors.textFaint),
                     ),
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    camera.hasMotion ? 'MOTION' : 'LIVE',
-                    style: TextStyle(
+                    camera.hasMotion ? 'MOTION' : (camera.isStreamable ? 'LIVE' : 'NO STREAM'),
+                    style: NexusText.caption.copyWith(
                       fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.6,
-                      color: const Color(0xFFFFFFFF).withValues(alpha: 0.85),
+                      color: _tileWhite.withValues(alpha: 0.85),
                     ),
                   ),
                 ],
@@ -181,21 +239,38 @@ class _CameraTile extends StatelessWidget {
             Positioned(
               left: 8,
               bottom: 8,
+              right: 8,
               child: Text(
                 camera.name,
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: const Color(0xFFFFFFFF).withValues(alpha: 0.9)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: NexusText.footnote.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: _tileWhite.withValues(alpha: 0.9),
+                ),
               ),
             ),
-            if (expanded)
+            if (widget.expanded && !camera.isStreamable)
               Positioned.fill(
                 child: Container(
-                  color: const Color(0xCC000000),
-                  padding: const EdgeInsets.all(10),
-                  child: const Center(
-                    child: Text(
-                      'Connect server to enable live feed',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: Color(0xFFE5E5EA), fontWeight: FontWeight.w500),
+                  color: NexusColors.overlayScrim,
+                  padding: const EdgeInsets.all(12),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'No stream configured',
+                          textAlign: TextAlign.center,
+                          style: NexusText.bodyMedium.copyWith(color: _tileWhite),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Add this camera to NEXUS_CAMERAS on the server with an HLS URL.',
+                          textAlign: TextAlign.center,
+                          style: NexusText.footnote.copyWith(color: _tileWhite.withValues(alpha: 0.75)),
+                        ),
+                      ],
                     ),
                   ),
                 ),
