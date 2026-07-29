@@ -10,13 +10,24 @@ import 'nexus_data_source.dart';
 /// [ServerClient] - both implement [NexusDataSource] so the UI doesn't
 /// care which one is active.
 class CompoundStore extends NexusDataSource {
-  CompoundStore({Compound? seed}) : compound = seed ?? buildDemoCompound() {
+  CompoundStore({Compound? seed, this.onPersist, bool simulate = true})
+      : compound = seed ?? buildDemoCompound() {
     _recomputeInsights();
-    _ticker = Timer.periodic(const Duration(seconds: 2), (_) => _tick());
+    // A compound you built yourself shouldn't have its devices drifting on
+    // their own - the ticker is demo behavior, so it's opt-out.
+    if (simulate) {
+      _ticker = Timer.periodic(const Duration(seconds: 2), (_) => _tick());
+    }
   }
 
   @override
   final Compound compound;
+
+  /// Called after every user-driven change so the caller can persist. Not
+  /// called from the simulation ticker: that fires every 2s and would write
+  /// constantly for state nobody asked to keep.
+  final void Function(Compound compound)? onPersist;
+
   Timer? _ticker;
   final _random = Random();
 
@@ -39,7 +50,112 @@ class CompoundStore extends NexusDataSource {
     body();
     _recomputeInsights();
     notifyListeners();
+    onPersist?.call(compound);
   }
+
+  /// Ids are derived from the name so they read sensibly in logs and in the
+  /// AI assistant's `<action>` tags, with a numeric suffix only when needed
+  /// to stay unique.
+  static String _slug(String name, Iterable<String> taken) {
+    var base = name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+    if (base.isEmpty) base = 'item';
+    if (!taken.contains(base)) return base;
+    for (var i = 2;; i++) {
+      final candidate = '${base}_$i';
+      if (!taken.contains(candidate)) return candidate;
+    }
+  }
+
+  // ---- Compound structure -------------------------------------------------
+  // Adding and removing buildings/rooms is what turns the app from a fixed
+  // demo into something that can model an actual property.
+
+  /// Adds a building (and the map zone that puts it on the Home map).
+  /// [mapX]/[mapY] are normalized 0..1 positions on the map canvas.
+  Building addBuilding(String name, {double mapX = 0.5, double mapY = 0.5}) {
+    final id = _slug(name, compound.buildings.map((b) => b.id));
+    final building = Building(id: id, name: name, zoneId: id);
+    _mutate(() {
+      compound.buildings.add(building);
+      compound.zones.add(Zone(
+        id: id,
+        name: name,
+        buildingIds: [id],
+        mapX: mapX.clamp(0.05, 0.95),
+        mapY: mapY.clamp(0.05, 0.95),
+        primaryBuildingId: id,
+      ));
+    });
+    return building;
+  }
+
+  void renameBuilding(String id, String name) => _mutate(() {
+        compound.buildings.firstWhere((b) => b.id == id).name = name;
+        for (final zone in compound.zones.where((z) => z.buildingIds.contains(id))) {
+          if (zone.buildingIds.length == 1) zone.name = name;
+        }
+      });
+
+  /// Removes a building along with everything anchored to it - leaving
+  /// orphaned rooms or devices behind would surface as ghost entries all over
+  /// the UI, since devices reference buildings by id.
+  void removeBuilding(String id) => _mutate(() {
+        compound.buildings.removeWhere((b) => b.id == id);
+        compound.rooms.removeWhere((r) => r.buildingId == id);
+        compound.devices.removeWhere((d) => d.buildingId == id);
+        for (final zone in compound.zones) {
+          zone.buildingIds.remove(id);
+        }
+        compound.zones.removeWhere((z) => z.buildingIds.isEmpty);
+      });
+
+  Room addRoom(String buildingId, String name) {
+    final room = Room(
+      id: _slug('${buildingId}_$name', compound.rooms.map((r) => r.id)),
+      buildingId: buildingId,
+      name: name,
+    );
+    _mutate(() => compound.rooms.add(room));
+    return room;
+  }
+
+  void renameRoom(String id, String name) =>
+      _mutate(() => compound.rooms.firstWhere((r) => r.id == id).name = name);
+
+  void removeRoom(String id) => _mutate(() {
+        compound.rooms.removeWhere((r) => r.id == id);
+        compound.devices.removeWhere((d) => d.roomId == id);
+      });
+
+  /// Builds a device of [type] with sensible defaults and a unique id.
+  /// Locks always attach to the building rather than a room, matching the
+  /// model's own rule.
+  Device addDeviceOfType({
+    required DeviceType type,
+    required String name,
+    required String buildingId,
+    String? roomId,
+  }) {
+    final id = _slug(name, compound.devices.map((d) => d.id));
+    final device = switch (type) {
+      DeviceType.light => LightDevice(id: id, name: name, buildingId: buildingId, roomId: roomId),
+      DeviceType.climate => ClimateDevice(id: id, name: name, buildingId: buildingId, roomId: roomId),
+      DeviceType.grill => GrillDevice(id: id, name: name, buildingId: buildingId, roomId: roomId),
+      DeviceType.media => MediaDevice(id: id, name: name, buildingId: buildingId, roomId: roomId),
+      DeviceType.lock => LockDevice(id: id, name: name, buildingId: buildingId),
+    };
+    addDevice(device);
+    return device;
+  }
+
+  void renameDevice(String id, String name) =>
+      _mutate(() => compound.devices.firstWhere((d) => d.id == id).name = name);
+
+  void removeDevice(String id) =>
+      _mutate(() => compound.devices.removeWhere((d) => d.id == id));
 
   // ---- Light -------------------------------------------------------------
 

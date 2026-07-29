@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:nexus_shared/nexus_shared.dart';
 import 'ai/ai_settings.dart';
 import 'ai/provider_registry.dart';
 import 'state/ai_scope.dart';
+import 'state/app_mode.dart';
+import 'state/compound_persistence.dart';
 import 'state/compound_scope.dart';
 import 'state/compound_store.dart';
 import 'state/connection_scope.dart';
@@ -13,6 +16,7 @@ import 'state/nexus_data_source.dart';
 import 'state/server_client.dart';
 import 'theme/app_theme.dart';
 import 'screens/nexus_ai/chat_engine.dart';
+import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/root_shell.dart';
 
 void main() {
@@ -31,9 +35,16 @@ class NexusApp extends StatefulWidget {
 
 class _NexusAppState extends State<NexusApp> {
   final _settings = ConnectionSettings();
+  final _modeSettings = AppModeSettings();
   final _downloads = DownloadManager();
   late NexusDataSource _store = _createInitialDataSource();
   StoredConnection? _current;
+
+  /// Null until the persisted mode has been read. Onboarding shows only once
+  /// that read has finished and come back empty - otherwise a slow keystore
+  /// would flash the setup screen at someone who already chose.
+  AppMode? _mode;
+  bool _modeResolved = false;
 
   /// Multi-provider AI routing (on-device / Mac Studio / Anthropic / OpenAI).
   /// The `storeOf`/`systemContext`/`localResponder` callbacks close over the
@@ -69,11 +80,56 @@ class _NexusAppState extends State<NexusApp> {
   @override
   void initState() {
     super.initState();
+    _restoreMode();
     _loadPersistedConnection();
     // Load any previously-downloaded titles (native only; a no-op on web).
     _downloads.load();
     // Load this device's preferred AI provider/model + keys.
     _ai.load();
+  }
+
+  /// Reads the saved mode and, for a local compound, the saved compound with
+  /// it. The `?server=` override implies server mode without asking.
+  Future<void> _restoreMode() async {
+    if (_store is ServerClient) {
+      if (mounted) setState(() { _mode = AppMode.server; _modeResolved = true; });
+      return;
+    }
+    final mode = await _modeSettings.load();
+    if (!mounted) return;
+    if (mode == AppMode.local) {
+      final saved = await loadCompound();
+      if (!mounted) return;
+      _switchTo(_localStore(saved), current: null);
+    }
+    setState(() {
+      _mode = mode;
+      _modeResolved = true;
+    });
+  }
+
+  /// A store over the user's own compound: no simulation ticker, and every
+  /// change written straight back to disk.
+  CompoundStore _localStore(Compound? seed) => CompoundStore(
+        seed: seed ?? buildEmptyCompound(),
+        simulate: false,
+        onPersist: saveCompound,
+      );
+
+  Future<void> _chooseMode(AppMode mode) async {
+    await _modeSettings.save(mode);
+    if (!mounted) return;
+    switch (mode) {
+      case AppMode.local:
+        _switchTo(_localStore(null), current: null);
+      case AppMode.demo:
+        _switchTo(CompoundStore(), current: null);
+      case AppMode.server:
+        // Land in an empty local compound so the shell has something to
+        // render, and let the Settings tab drive the actual pairing.
+        _switchTo(_localStore(null), current: null);
+    }
+    setState(() => _mode = mode);
   }
 
   Future<void> _loadPersistedConnection() async {
@@ -104,12 +160,16 @@ class _NexusAppState extends State<NexusApp> {
 
   Future<void> _connect(StoredConnection connection) async {
     await _settings.save(connection);
+    await _modeSettings.save(AppMode.server);
+    if (mounted) setState(() => _mode = AppMode.server);
     _switchTo(ServerClient(hostOrUrl: connection.serverAddress, token: connection.token), current: connection);
   }
 
   Future<void> _forget() async {
     await _settings.clear();
-    _switchTo(CompoundStore(), current: null);
+    await _modeSettings.clear();
+    _switchTo(_localStore(await loadCompound()), current: null);
+    if (mounted) setState(() => _mode = null);
   }
 
   @override
@@ -136,7 +196,9 @@ class _NexusAppState extends State<NexusApp> {
               title: 'NEXUS',
               debugShowCheckedModeBanner: false,
               theme: buildNexusTheme(),
-              home: const RootShell(),
+              home: (_modeResolved && _mode == null)
+                  ? OnboardingScreen(onChoose: _chooseMode)
+                  : const RootShell(),
             ),
           ),
         ),
