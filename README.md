@@ -30,7 +30,8 @@ by [`.github/workflows/release.yml`](.github/workflows/release.yml) and
 attached to the [latest GitHub Release](https://github.com/natehale05-gif/Nexus/releases/latest).
 No Flutter, no Visual Studio, no Xcode needed on the machine you're
 installing onto. See [Installing a download](#installing-a-download) for the
-per-OS unsigned-app warnings you'll hit.
+per-OS unsigned-app warnings you'll hit - in particular, Windows 11's **Smart
+App Control** blocks unsigned installers with no "run anyway" option.
 
 Prefer nothing to install? The web build runs in any browser - see
 [Testing it live (GitHub Pages)](#testing-it-live-github-pages). It's the
@@ -65,14 +66,62 @@ flutter run -d chrome   # or -d macos / -d windows / a connected iOS device
 
 None of the installers are code-signed - that needs a paid Apple Developer ID
 and a Windows code-signing certificate this project doesn't have. So Windows
-and macOS will warn you the first time, and you have to tell them you meant
-it. That's the only friction; the install itself is normal.
+and macOS will warn you the first time. On macOS, and for Windows
+SmartScreen, you can wave the warning through. **Windows 11's Smart App
+Control is the exception - it has no override at all**; see below.
 
-**Windows** - run `NEXUS-windows-x64-setup.exe`. SmartScreen will say
-"Windows protected your PC" → **More info** → **Run anyway**. It installs
-per-user under `%LOCALAPPDATA%\Programs\NEXUS`, so there's no UAC prompt and
-you don't need an admin account. Uninstall from **Settings → Apps** like
-anything else.
+**Windows** - run `NEXUS-windows-x64-setup.exe`. It installs per-user under
+`%LOCALAPPDATA%\Programs\NEXUS`, so there's no UAC prompt and you don't need
+an admin account. Uninstall from **Settings → Apps** like anything else.
+
+Windows 11 has *two* different gates, and they behave differently:
+
+- **SmartScreen** - "Windows protected your PC". Click **More info** →
+  **Run anyway**. This one has an override.
+- **Smart App Control** - "Smart App Control blocked an app that may be
+  unsafe". This one **has no override**. There is no "run anyway" button, and
+  no amount of clicking will get past it, because SAC only permits apps
+  signed by a certificate that already carries reputation with Microsoft.
+
+If you hit Smart App Control, your options are:
+
+1. **Use the web app instead** - open the GitHub Pages URL and install it as
+   a PWA (Edge: ⋯ → Apps → Install this site as an app). Nothing to sign,
+   nothing blocked. You give up offline downloads and on-device AI.
+2. **Turn Smart App Control off** - Windows Security → **App & browser
+   control** → **Smart App Control settings** → **Off**. Understand the
+   trade before you do it: **this is one-way.** Microsoft does not let you
+   switch SAC back on afterwards without reinstalling Windows, and it's a
+   system-wide protection, not a per-app exception. Don't disable it just for
+   this app unless you're comfortable with that permanently.
+3. **Sign the installer** - the actual fix, and the only one that keeps SAC
+   on. See [Code signing](#code-signing) below.
+
+Building the app yourself on that machine also sidesteps it, since locally
+compiled binaries never pick up the internet Mark-of-the-Web that triggers
+the check - but that means installing Flutter and Visual Studio, which is
+most of what these installers exist to avoid.
+
+### Code signing
+
+Nothing in this repo is signed, which is why Windows and macOS both push
+back. If NEXUS is going on machines you'd rather not weaken, signing is worth
+the money:
+
+- **Windows** - [Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/)
+  is the cheap route (roughly $10/month for an individual, subject to an
+  identity check) and it satisfies both SmartScreen and Smart App Control. A
+  traditional OV certificate is cheaper up front but builds SmartScreen
+  reputation slowly and may still trip SAC; an EV certificate works
+  immediately but runs several hundred dollars a year. A self-signed
+  certificate does **not** help - SAC doesn't care that a signature exists,
+  it cares whose it is.
+- **macOS** - an Apple Developer ID ($99/year) plus notarization removes the
+  Gatekeeper prompt entirely.
+
+`release.yml` doesn't sign anything today. Wiring it up is a contained change
+once a certificate exists: add the signing step after the build and feed the
+credentials in as repository secrets.
 
 **macOS** - open `NEXUS-macos.dmg` and drag **NEXUS** onto **Applications**.
 The first launch, Gatekeeper will refuse an unsigned app, so right-click
