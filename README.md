@@ -102,27 +102,6 @@ compiled binaries never pick up the internet Mark-of-the-Web that triggers
 the check - but that means installing Flutter and Visual Studio, which is
 most of what these installers exist to avoid.
 
-### Code signing
-
-Nothing in this repo is signed, which is why Windows and macOS both push
-back. If NEXUS is going on machines you'd rather not weaken, signing is worth
-the money:
-
-- **Windows** - [Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/)
-  is the cheap route (roughly $10/month for an individual, subject to an
-  identity check) and it satisfies both SmartScreen and Smart App Control. A
-  traditional OV certificate is cheaper up front but builds SmartScreen
-  reputation slowly and may still trip SAC; an EV certificate works
-  immediately but runs several hundred dollars a year. A self-signed
-  certificate does **not** help - SAC doesn't care that a signature exists,
-  it cares whose it is.
-- **macOS** - an Apple Developer ID ($99/year) plus notarization removes the
-  Gatekeeper prompt entirely.
-
-`release.yml` doesn't sign anything today. Wiring it up is a contained change
-once a certificate exists: add the signing step after the build and feed the
-credentials in as repository secrets.
-
 **macOS** - open `NEXUS-macos.dmg` and drag **NEXUS** onto **Applications**.
 The first launch, Gatekeeper will refuse an unsigned app, so right-click
 NEXUS in Applications → **Open** → **Open** (this is only needed once). If it
@@ -145,6 +124,27 @@ terminal. Remove it with `sudo apt remove nexus`.
 The `.deb` targets the current Ubuntu LTS. On a non-Debian distro use the
 `.tar.gz` instead - extract it and run `./NEXUS/nexus`, with `libgtk-3`,
 `libmpv`, `libsecret` and `libepoxy` installed from your own package manager.
+
+### Code signing
+
+Nothing in this repo is signed, which is why Windows and macOS both push
+back. If NEXUS is going on machines you'd rather not weaken, signing is worth
+the money:
+
+- **Windows** - [Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/)
+  is the cheap route (roughly $10/month for an individual, subject to an
+  identity check) and it satisfies both SmartScreen and Smart App Control. A
+  traditional OV certificate is cheaper up front but builds SmartScreen
+  reputation slowly and may still trip SAC; an EV certificate works
+  immediately but runs several hundred dollars a year. A self-signed
+  certificate does **not** help - SAC doesn't care that a signature exists,
+  it cares whose it is.
+- **macOS** - an Apple Developer ID ($99/year) plus notarization removes the
+  Gatekeeper prompt entirely.
+
+`release.yml` doesn't sign anything today. Wiring it up is a contained change
+once a certificate exists: add the signing step after the build and feed the
+credentials in as repository secrets.
 
 There's also a **PWA** route on Windows and desktop Chrome/Edge: open the
 GitHub Pages URL and use the address-bar **Install** button (Edge: ⋯ → Apps →
