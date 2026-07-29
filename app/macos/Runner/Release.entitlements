@@ -4,5 +4,12 @@
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
+	<!-- NEXUS is a client of your own server: it opens a WebSocket + REST
+	     connection to nexus_server (usually over Tailscale), streams media
+	     from it, and - when configured - talks to Ollama/Anthropic/OpenAI.
+	     Without this the sandbox silently blocks every outbound connection
+	     in release builds. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 </dict>
 </plist>

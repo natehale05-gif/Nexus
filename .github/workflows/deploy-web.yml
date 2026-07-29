@@ -36,7 +36,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.35.5'
+          flutter-version: '3.44.8'
           channel: stable
 
       - name: Install shared package dependencies

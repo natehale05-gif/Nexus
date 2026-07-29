@@ -8,5 +8,8 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- Same reason as Release.entitlements: the app talks to nexus_server. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 </dict>
 </plist>

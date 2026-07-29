@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+// material.dart no longer re-exports the Cupertino route transitions, so pull
+// the one builder we need in directly (a `show` clause keeps the rest of the
+// Cupertino namespace from colliding with Material's).
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
+
 import 'tokens.dart';
 
 ThemeData buildNexusTheme() {

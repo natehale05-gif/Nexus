@@ -8,6 +8,24 @@ streamer (not a bridge to an external Jellyfin instance), and adds a handful
 of other integrations (Ollama, Frigate, UniFi, and - the one that's
 inherently cloud-gated - Traeger).
 
+## Download
+
+[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/natehale05-gif/Nexus/releases/latest/download/NEXUS-windows-x64.zip)
+[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/natehale05-gif/Nexus/releases/latest/download/NEXUS-macos.zip)
+[![Download for Linux](https://img.shields.io/badge/Download-Linux-F5A623?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/natehale05-gif/Nexus/releases/latest/download/NEXUS-linux-x64.tar.gz)
+
+Those three buttons always serve the newest published release - they're built
+by [`.github/workflows/release.yml`](.github/workflows/release.yml) and
+attached to the [latest GitHub Release](https://github.com/natehale05-gif/Nexus/releases/latest).
+No Flutter, no Visual Studio, no Xcode needed on the machine you're
+installing onto. See [Installing a download](#installing-a-download) for the
+per-OS unsigned-app warnings you'll hit.
+
+Prefer nothing to install? The web build runs in any browser - see
+[Testing it live (GitHub Pages)](#testing-it-live-github-pages). It's the
+same app, minus the two things a browser can't do: **offline downloads** and
+**on-device AI**.
+
 This repo is a monorepo with three packages:
 
 ```
@@ -32,24 +50,47 @@ flutter pub get
 flutter run -d chrome   # or -d macos / -d windows / a connected iOS device
 ```
 
-### Getting NEXUS onto a Windows laptop
+### Installing a download
 
-Two options, neither of which needs Flutter installed on that laptop:
+None of the release builds are code-signed - that needs a paid Apple
+Developer ID and a Windows code-signing certificate this project doesn't
+have. So every OS will warn you the first time, and you have to tell it you
+meant it:
 
-1. **Native Windows app (a real .exe).** Every push builds one in CI
-   (`.github/workflows/build-windows.yml`). On GitHub go to **Actions → Build
-   Windows app → the latest run → Artifacts → `nexus-windows`**, download the
-   zip, unzip it anywhere, and run **`nexus_app.exe`**. It's a portable
-   folder build, so keep the `.dll`s and the `data/` folder next to the exe.
-   Windows SmartScreen will warn on an unsigned exe - "More info → Run
-   anyway" (code signing needs a certificate this project doesn't have).
-2. **Web app, no install.** Open the GitHub Pages URL in Edge or Chrome, then
-   use the address-bar **Install** button (Edge: ⋯ → Apps → Install this
-   site as an app). It gets its own window and the NEXUS icon.
+**Windows** (`NEXUS-windows-x64.zip`) - unzip anywhere and run
+**`nexus_app.exe`**. It's a portable folder build, so keep the `.dll`s and
+the `data/` folder next to the exe; don't pull the exe out on its own.
+SmartScreen will say "Windows protected your PC" → **More info → Run
+anyway**.
 
-The native build is the better one on Windows: it's the only one that can do
-**offline downloads** (see below), since a browser has no app-managed storage
-for large video.
+**macOS** (`NEXUS-macos.zip`) - unzip and drag **NEXUS.app** to
+`/Applications`. Gatekeeper blocks ad-hoc-signed apps, so either right-click
+the app → **Open** → **Open**, or clear the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/NEXUS.app
+```
+
+**Linux** (`NEXUS-linux-x64.tar.gz`) - extract and run the `nexus` binary:
+
+```bash
+tar -xzf NEXUS-linux-x64.tar.gz
+./NEXUS/nexus
+```
+
+It's built on the current Ubuntu LTS runner, so it needs a reasonably recent
+glibc/GTK 3. It also needs **libmpv** (the video player backend) and
+**libsecret** (where the pairing token and AI keys are stored) present on the
+system:
+
+```bash
+sudo apt install libmpv2 libsecret-1-0    # Debian/Ubuntu
+```
+
+There's also a **PWA** route on Windows and desktop Chrome/Edge: open the
+GitHub Pages URL and use the address-bar **Install** button (Edge: ⋯ → Apps →
+Install this site as an app). It gets its own window and the NEXUS icon - but
+it's still the web build, so no offline downloads and no on-device AI.
 
 The app boots straight into **local-demo-mode**: `CompoundStore` seeds
 itself from `nexus_shared`'s `buildDemoCompound()` and runs the same

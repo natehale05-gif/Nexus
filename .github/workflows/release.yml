@@ -1,0 +1,159 @@
+name: Desktop apps
+
+# Builds the native NEXUS desktop app for Windows, macOS and Linux, and - when
+# a version tag is pushed (or this workflow is dispatched with a tag) -
+# publishes the three builds as assets on a GitHub Release.
+#
+# The Release is what makes the README's download buttons work: GitHub serves
+# the newest non-prerelease at a permanent URL, so
+#   https://github.com/<owner>/<repo>/releases/latest/download/NEXUS-windows-x64.zip
+# always points at the current build. Actions artifacts can't do that - they
+# require a GitHub login and expire - so they're only used here to hand the
+# built app from each platform job to the release job.
+#
+# Cutting a release:
+#   git tag v0.1.0 && git push origin v0.1.0
+# or run this workflow manually and fill in the `tag` input.
+
+on:
+  push:
+    branches:
+      - main
+      - 'cursor/**'
+      - 'claude/**'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish a Release as (e.g. v0.1.0). Leave blank to just build.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  # Must be a Flutter whose `flutter build windows` knows the Visual Studio
+  # 2026 (major 18) CMake generator - windows-latest is now the
+  # windows-2025-vs2026 image, and older Flutter falls back to asking for
+  # "Visual Studio 16 2019", which isn't installed there.
+  FLUTTER_VERSION: '3.44.8'
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            asset: NEXUS-windows-x64.zip
+          - os: macos-latest
+            platform: macos
+            asset: NEXUS-macos.zip
+          - os: ubuntu-latest
+            platform: linux
+            asset: NEXUS-linux-x64.tar.gz
+    steps:
+      - uses: actions/checkout@v4
+
+      # GTK for the shell, libmpv/epoxy for media_kit's video player, and
+      # libsecret for flutter_secure_storage's Linux keyring backend.
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang cmake ninja-build pkg-config liblzma-dev \
+            libgtk-3-dev libmpv-dev libepoxy-dev libsecret-1-dev libjsoncpp-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Install shared package dependencies
+        run: dart pub get
+        working-directory: shared
+
+      - name: Install app dependencies
+        run: flutter pub get
+        working-directory: app
+
+      - name: Build ${{ matrix.platform }} (release)
+        run: flutter build ${{ matrix.platform }} --release
+        working-directory: app
+
+      # Portable folder build: the .exe needs the DLLs and data/ beside it, so
+      # the whole Release directory goes in the zip.
+      - name: Package Windows
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path app/build/windows/x64/runner/Release/* `
+                           -DestinationPath dist/${{ matrix.asset }}
+      # ditto (not zip) so the .app bundle's symlinks and permission bits
+      # survive the round trip - a plain zip produces a bundle macOS refuses
+      # to launch.
+      - name: Package macOS
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p dist
+          app_path="$(find app/build/macos/Build/Products/Release -maxdepth 1 -name '*.app' | head -n 1)"
+          if [ -z "$app_path" ]; then echo "No .app bundle was produced"; exit 1; fi
+          echo "Packaging $app_path"
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" "dist/${{ matrix.asset }}"
+
+      - name: Package Linux
+        if: matrix.platform == 'linux'
+        run: |
+          mkdir -p dist
+          # Ship it as a NEXUS/ directory rather than loose files, so
+          # extracting doesn't scatter a bundle across the user's cwd.
+          mv app/build/linux/x64/release/bundle app/build/linux/x64/release/NEXUS
+          tar -czf "dist/${{ matrix.asset }}" -C app/build/linux/x64/release NEXUS
+
+      - name: Upload ${{ matrix.asset }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: dist/${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    # Only publish for an explicit version - ordinary branch pushes just build.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.tag != ''
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect built apps
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_type == 'tag' && github.ref_name || github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          ls -lh dist
+          # Re-runnable: replace the assets if the tag already has a Release.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* \
+              --target "$GITHUB_SHA" \
+              --title "NEXUS $TAG" \
+              --generate-notes
+          fi
