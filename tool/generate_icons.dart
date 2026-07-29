@@ -78,6 +78,8 @@ void main() {
   for (final entry in _androidSizes.entries) {
     _write('$_androidRes/${entry.key}/ic_launcher.png', square, entry.value);
   }
+  // Windows wants a multi-resolution .ico for the exe + title bar.
+  _writeIco('app/windows/runner/resources/app_icon.ico', master, const [16, 32, 48, 64, 128, 256]);
   _write('$_webDir/Icon-192.png', master, 192);
   _write('$_webDir/Icon-512.png', master, 512);
   // Maskable variants need the mark well inside the safe zone; the square
@@ -94,6 +96,16 @@ void _write(String path, Image source, int size) {
   final file = File(path)..parent.createSync(recursive: true);
   file.writeAsBytesSync(encodePng(resized));
   stdout.writeln('  ${size.toString().padLeft(4)}px  $path');
+}
+
+void _writeIco(String path, Image source, List<int> sizes) {
+  final frames = [
+    for (final size in sizes)
+      copyResize(source, width: size, height: size, interpolation: Interpolation.cubic),
+  ];
+  final file = File(path)..parent.createSync(recursive: true);
+  file.writeAsBytesSync(IcoEncoder().encodeImages(frames));
+  stdout.writeln('  ${sizes.join('/')}px  $path');
 }
 
 Image _renderIcon(int size, {required bool rounded}) {

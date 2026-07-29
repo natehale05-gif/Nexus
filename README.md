@@ -29,8 +29,27 @@ server/   The Dart server: WebSocket state sync (8765) + REST (8766),
 ```bash
 cd app
 flutter pub get
-flutter run -d chrome   # or -d macos / a connected iOS device / etc.
+flutter run -d chrome   # or -d macos / -d windows / a connected iOS device
 ```
+
+### Getting NEXUS onto a Windows laptop
+
+Two options, neither of which needs Flutter installed on that laptop:
+
+1. **Native Windows app (a real .exe).** Every push builds one in CI
+   (`.github/workflows/build-windows.yml`). On GitHub go to **Actions → Build
+   Windows app → the latest run → Artifacts → `nexus-windows`**, download the
+   zip, unzip it anywhere, and run **`nexus_app.exe`**. It's a portable
+   folder build, so keep the `.dll`s and the `data/` folder next to the exe.
+   Windows SmartScreen will warn on an unsigned exe - "More info → Run
+   anyway" (code signing needs a certificate this project doesn't have).
+2. **Web app, no install.** Open the GitHub Pages URL in Edge or Chrome, then
+   use the address-bar **Install** button (Edge: ⋯ → Apps → Install this
+   site as an app). It gets its own window and the NEXUS icon.
+
+The native build is the better one on Windows: it's the only one that can do
+**offline downloads** (see below), since a browser has no app-managed storage
+for large video.
 
 The app boots straight into **local-demo-mode**: `CompoundStore` seeds
 itself from `nexus_shared`'s `buildDemoCompound()` and runs the same

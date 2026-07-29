@@ -1,0 +1,48 @@
+name: Build Windows app
+
+# Builds the native Windows desktop app and uploads it as a downloadable
+# artifact, so a Windows machine can grab a ready-to-run NEXUS without
+# installing Flutter or Visual Studio locally.
+#
+# To get it: open this workflow run on GitHub -> Actions -> the latest
+# "Build Windows app" run -> Artifacts -> nexus-windows. Unzip anywhere and
+# run nexus_app.exe (it's a portable folder build - keep the DLLs and the
+# data/ folder next to the .exe).
+
+on:
+  push:
+    branches:
+      - main
+      - 'cursor/**'
+      - 'claude/**'
+  workflow_dispatch: {}
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.5'
+          channel: stable
+
+      - name: Install shared package dependencies
+        run: dart pub get
+        working-directory: shared
+
+      - name: Install app dependencies
+        run: flutter pub get
+        working-directory: app
+
+      - name: Build Windows (release)
+        run: flutter build windows --release
+        working-directory: app
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-windows
+          path: app/build/windows/x64/runner/Release/
+          if-no-files-found: error
