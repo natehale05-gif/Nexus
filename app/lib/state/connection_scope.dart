@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 
+import 'app_mode.dart';
 import 'connection_settings.dart';
 
 /// Lets the Settings screen ask [NexusApp] to swap the app's active
@@ -12,6 +13,8 @@ class ConnectionScope extends InheritedWidget {
     required this.current,
     required this.onConnect,
     required this.onForget,
+    required this.mode,
+    required this.onChooseMode,
     required super.child,
   });
 
@@ -25,6 +28,14 @@ class ConnectionScope extends InheritedWidget {
   /// Clears any persisted connection and switches back to local-demo-mode.
   final Future<void> Function() onForget;
 
+  /// How this device is currently running - null before the stored value has
+  /// been read, or after it's been reset (which re-shows onboarding).
+  final AppMode? mode;
+
+  /// Switches modes and persists the choice. Settings offers this so the
+  /// first-run decision isn't a one-way door.
+  final Future<void> Function(AppMode mode) onChooseMode;
+
   static ConnectionScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<ConnectionScope>();
     assert(scope != null, 'No ConnectionScope found in context');
@@ -32,5 +43,6 @@ class ConnectionScope extends InheritedWidget {
   }
 
   @override
-  bool updateShouldNotify(ConnectionScope oldWidget) => oldWidget.current != current;
+  bool updateShouldNotify(ConnectionScope oldWidget) =>
+      oldWidget.current != current || oldWidget.mode != mode;
 }

@@ -4,6 +4,7 @@ import '../../ai/ai_provider.dart';
 import '../../ai/ai_settings.dart';
 import '../../ai/provider_registry.dart';
 import '../../state/ai_scope.dart';
+import '../../state/app_mode.dart';
 import '../../state/compound_scope.dart';
 import '../../state/connection_scope.dart';
 import '../../state/connection_settings.dart';
@@ -325,6 +326,7 @@ class _SettingsTabState extends State<SettingsTab> {
                       ),
                     ],
                     const SizedBox(height: 20),
+                    ..._modeSection(connectionScope),
                     ..._mapSection(),
                     ..._aiSection(registry),
                   ],
@@ -340,6 +342,59 @@ class _SettingsTabState extends State<SettingsTab> {
   /// The 3D compound map is served by Cesium ion, which authorizes tile
   /// requests per-account - so the token can't be shipped in the repo and has
   /// to be pasted in per install. Hidden on platforms with no CesiumJS map.
+  /// Lets someone move between the demo, their own local compound, and a
+  /// paired server after first run - the onboarding screen promises this is
+  /// changeable, so it has to actually be reachable.
+  List<Widget> _modeSection(ConnectionScope scope) {
+    const copy = {
+      AppMode.server: 'Paired with a server. It owns the compound, media and cameras.',
+      AppMode.local: 'This device holds your compound. Edit it from the Buildings tab.',
+      AppMode.demo: 'The example compound. Nothing here is real.',
+    };
+    return [
+      Text('Mode', style: NexusText.footnote),
+      const SizedBox(height: 10),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              scope.mode == null ? 'Not set up yet.' : copy[scope.mode]!,
+              style: NexusText.subhead,
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final mode in AppMode.values)
+                  _AiProviderChip(
+                    label: switch (mode) {
+                      AppMode.server => 'My server',
+                      AppMode.local => 'This device',
+                      AppMode.demo => 'Demo',
+                    },
+                    selected: scope.mode == mode,
+                    onTap: () => scope.onChooseMode(mode),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Switching to "This device" keeps whatever compound you have already '
+              'built here; the demo is regenerated fresh each time and never '
+              'overwrites it.',
+              style: NexusText.footnote,
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
   List<Widget> _mapSection() {
     if (!mapTokenConfigurable) return const [];
     return [

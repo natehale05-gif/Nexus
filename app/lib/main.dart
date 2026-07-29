@@ -186,6 +186,8 @@ class _NexusAppState extends State<NexusApp> {
       current: _current,
       onConnect: _connect,
       onForget: _forget,
+      mode: _mode,
+      onChooseMode: _chooseMode,
       child: AiScope(
         registry: _ai,
         child: DownloadScope(

@@ -151,11 +151,41 @@ GitHub Pages URL and use the address-bar **Install** button (Edge: ⋯ → Apps 
 Install this site as an app). It gets its own window and the NEXUS icon - but
 it's still the web build, so no offline downloads and no on-device AI.
 
-The app boots straight into **local-demo-mode**: `CompoundStore` seeds
-itself from `nexus_shared`'s `buildDemoCompound()` and runs the same
-simulation tick the server uses, so every screen is fully interactive with
-no server required. This matches the build order in the original spec
-(Section 9, step 5: "wired to local state first, no server yet").
+## First run
+
+The first launch asks what this device is for, and remembers the answer:
+
+- **Connect to my server** - pair with a `nexus_server` (see
+  [Remote access with Tailscale](#remote-access-with-tailscale)). The server
+  owns the compound, media library and cameras, and every paired device stays
+  in sync.
+- **Start a compound here** - begin empty and build your own: add buildings,
+  rooms and devices from the **Buildings** tab. Saved on the device (a JSON
+  file in app documents on desktop/mobile, `localStorage` on web) so it
+  survives restarts. You can pair a server later.
+- **Look around the demo** - the seeded example compound from
+  `buildDemoCompound()`, running the same simulation tick the server uses.
+  Nothing in it is real; it exists to show what the app does.
+
+Change it any time in **Settings → Mode**. Switching to *This device* keeps
+whatever you've already built; the demo is regenerated fresh each launch and
+never overwrites your compound.
+
+### Building out your compound
+
+In **Buildings**, with a local compound:
+
+- **+ Building** at the end of the building strip, or the button on the empty
+  state for the first one.
+- Per building: **Add a room**, **Add a lock or gate** (locks attach to the
+  building, not a room), **Rename**, **Delete**.
+- Per room: **Add device** (light, climate, media, grill) and **Delete room**.
+
+Deleting a building removes its rooms and devices too - the confirmation says
+how many, since devices reference buildings by id and orphans would show up as
+ghost entries elsewhere. These controls are hidden when paired with a server:
+the server owns that state, so a local structural edit would be overwritten by
+its next push.
 
 ## The 3D compound map (CesiumJS)
 
