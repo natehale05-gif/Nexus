@@ -1,12 +1,19 @@
 name: Desktop apps
 
-# Builds the native NEXUS desktop app for Windows, macOS and Linux, and - when
-# a version tag is pushed (or this workflow is dispatched with a tag) -
-# publishes the three builds as assets on a GitHub Release.
+# Builds the native NEXUS desktop app for Windows, macOS and Linux, packages
+# each one as a real installer, and - when a version tag is pushed (or this
+# workflow is dispatched with a tag) - publishes them as GitHub Release assets:
+#
+#   NEXUS-windows-x64-setup.exe   Inno Setup installer (Start Menu entry,
+#                                 optional desktop shortcut, uninstaller in
+#                                 Add/Remove Programs)
+#   NEXUS-macos.dmg               disk image with a drag-to-Applications window
+#   NEXUS-linux-x64.deb           apt-installable; adds a launcher entry + icon
+#   NEXUS-linux-x64.tar.gz        portable build for non-Debian distros
 #
 # The Release is what makes the README's download buttons work: GitHub serves
 # the newest non-prerelease at a permanent URL, so
-#   https://github.com/<owner>/<repo>/releases/latest/download/NEXUS-windows-x64.zip
+#   https://github.com/<owner>/<repo>/releases/latest/download/NEXUS-windows-x64-setup.exe
 # always points at the current build. Actions artifacts can't do that - they
 # require a GitHub login and expire - so they're only used here to hand the
 # built app from each platform job to the release job.
@@ -57,24 +64,32 @@ jobs:
         include:
           - os: windows-latest
             platform: windows
-            asset: NEXUS-windows-x64.zip
           - os: macos-latest
             platform: macos
-            asset: NEXUS-macos.zip
           - os: ubuntu-latest
             platform: linux
-            asset: NEXUS-linux-x64.tar.gz
     steps:
       - uses: actions/checkout@v4
 
+      # A branch build has no tag, so it just gets 0.0.0 - it never ships.
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          tag='${{ github.ref_type == 'tag' && github.ref_name || github.event.inputs.tag }}'
+          [ -n "$tag" ] || tag='v0.0.0'
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
       # GTK for the shell, libmpv/epoxy for media_kit's video player, and
       # libsecret for flutter_secure_storage's Linux keyring backend.
+      # dpkg-dev gives us dpkg-shlibdeps for the .deb's Depends line.
       - name: Install Linux build dependencies
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            clang cmake ninja-build pkg-config liblzma-dev \
+            clang cmake ninja-build pkg-config liblzma-dev dpkg-dev \
             libgtk-3-dev libmpv-dev libepoxy-dev libsecret-1-dev libjsoncpp-dev
 
       - uses: subosito/flutter-action@v2
@@ -94,41 +109,55 @@ jobs:
         run: flutter build ${{ matrix.platform }} --release
         working-directory: app
 
-      # Portable folder build: the .exe needs the DLLs and data/ beside it, so
-      # the whole Release directory goes in the zip.
-      - name: Package Windows
+      # Inno Setup ships on the windows runner images, but install it if the
+      # image ever drops it rather than failing the release.
+      - name: Build Windows installer
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            Write-Host "Inno Setup not present; installing via Chocolatey."
+            choco install innosetup -y --no-progress
+          }
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Compress-Archive -Path app/build/windows/x64/runner/Release/* `
-                           -DestinationPath dist/${{ matrix.asset }}
-      # ditto (not zip) so the .app bundle's symlinks and permission bits
-      # survive the round trip - a plain zip produces a bundle macOS refuses
-      # to launch.
-      - name: Package macOS
+          & $iscc /DAppVersion=${{ steps.ver.outputs.version }} `
+                  app\windows\installer\nexus.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed ($LASTEXITCODE)" }
+
+      # A .dmg whose window has the app next to an /Applications symlink is the
+      # install gesture Mac users expect. hdiutil is part of macOS.
+      - name: Build macOS disk image
         if: matrix.platform == 'macos'
         run: |
-          mkdir -p dist
+          mkdir -p dist staging
           app_path="$(find app/build/macos/Build/Products/Release -maxdepth 1 -name '*.app' | head -n 1)"
           if [ -z "$app_path" ]; then echo "No .app bundle was produced"; exit 1; fi
           echo "Packaging $app_path"
-          ditto -c -k --sequesterRsrc --keepParent "$app_path" "dist/${{ matrix.asset }}"
+          cp -R "$app_path" staging/
+          ln -s /Applications staging/Applications
+          hdiutil create -volname NEXUS -srcfolder staging \
+            -ov -format UDZO dist/NEXUS-macos.dmg
 
       - name: Package Linux
         if: matrix.platform == 'linux'
         run: |
           mkdir -p dist
-          # Ship it as a NEXUS/ directory rather than loose files, so
+          # Ship the tarball as a NEXUS/ directory rather than loose files, so
           # extracting doesn't scatter a bundle across the user's cwd.
           mv app/build/linux/x64/release/bundle app/build/linux/x64/release/NEXUS
-          tar -czf "dist/${{ matrix.asset }}" -C app/build/linux/x64/release NEXUS
+          tar -czf dist/NEXUS-linux-x64.tar.gz -C app/build/linux/x64/release NEXUS
+          packaging/linux/build-deb.sh \
+            app/build/linux/x64/release/NEXUS \
+            '${{ steps.ver.outputs.version }}' \
+            dist/NEXUS-linux-x64.deb
 
-      - name: Upload ${{ matrix.asset }}
+      - name: Upload ${{ matrix.platform }} package
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset }}
-          path: dist/${{ matrix.asset }}
+          name: dist-${{ matrix.platform }}
+          path: dist/
           if-no-files-found: error
 
   release:

@@ -10,9 +10,20 @@ inherently cloud-gated - Traeger).
 
 ## Download
 
-[![Download for Windows](https://img.shields.io/badge/Download-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/natehale05-gif/Nexus/releases/latest/download/NEXUS-windows-x64.zip)
-[![Download for macOS](https://img.shields.io/badge/Download-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/natehale05-gif/Nexus/releases/latest/download/NEXUS-macos.zip)
-[![Download for Linux](https://img.shields.io/badge/Download-Linux-F5A623?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/natehale05-gif/Nexus/releases/latest/download/NEXUS-linux-x64.tar.gz)
+[![Download for Windows](https://img.shields.io/badge/Install-Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/natehale05-gif/Nexus/releases/latest/download/NEXUS-windows-x64-setup.exe)
+[![Download for macOS](https://img.shields.io/badge/Install-macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/natehale05-gif/Nexus/releases/latest/download/NEXUS-macos.dmg)
+[![Download for Linux](https://img.shields.io/badge/Install-Linux-F5A623?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/natehale05-gif/Nexus/releases/latest/download/NEXUS-linux-x64.deb)
+
+These are **installers**, not folders of loose files:
+
+| | Asset | What it does |
+|---|---|---|
+| Windows | `NEXUS-windows-x64-setup.exe` | Installs NEXUS, adds a Start Menu entry (and optionally a desktop shortcut), and registers an uninstaller in Add/Remove Programs. No admin rights needed. |
+| macOS | `NEXUS-macos.dmg` | Opens the familiar drag-**NEXUS**-to-**Applications** window. |
+| Linux | `NEXUS-linux-x64.deb` | `apt install`s to `/opt/nexus`, puts `nexus` on your PATH, and adds an icon + launcher entry to the applications menu. apt pulls the GTK/mpv/libsecret runtime libraries for you. |
+
+Not on a Debian-based distro? [`NEXUS-linux-x64.tar.gz`](https://github.com/natehale05-gif/Nexus/releases/latest/download/NEXUS-linux-x64.tar.gz)
+is a portable build you can extract and run anywhere.
 
 Those three buttons always serve the newest published release - they're built
 by [`.github/workflows/release.yml`](.github/workflows/release.yml) and
@@ -52,40 +63,39 @@ flutter run -d chrome   # or -d macos / -d windows / a connected iOS device
 
 ### Installing a download
 
-None of the release builds are code-signed - that needs a paid Apple
-Developer ID and a Windows code-signing certificate this project doesn't
-have. So every OS will warn you the first time, and you have to tell it you
-meant it:
+None of the installers are code-signed - that needs a paid Apple Developer ID
+and a Windows code-signing certificate this project doesn't have. So Windows
+and macOS will warn you the first time, and you have to tell them you meant
+it. That's the only friction; the install itself is normal.
 
-**Windows** (`NEXUS-windows-x64.zip`) - unzip anywhere and run
-**`nexus_app.exe`**. It's a portable folder build, so keep the `.dll`s and
-the `data/` folder next to the exe; don't pull the exe out on its own.
-SmartScreen will say "Windows protected your PC" → **More info → Run
-anyway**.
+**Windows** - run `NEXUS-windows-x64-setup.exe`. SmartScreen will say
+"Windows protected your PC" → **More info** → **Run anyway**. It installs
+per-user under `%LOCALAPPDATA%\Programs\NEXUS`, so there's no UAC prompt and
+you don't need an admin account. Uninstall from **Settings → Apps** like
+anything else.
 
-**macOS** (`NEXUS-macos.zip`) - unzip and drag **NEXUS.app** to
-`/Applications`. Gatekeeper blocks ad-hoc-signed apps, so either right-click
-the app → **Open** → **Open**, or clear the quarantine flag:
+**macOS** - open `NEXUS-macos.dmg` and drag **NEXUS** onto **Applications**.
+The first launch, Gatekeeper will refuse an unsigned app, so right-click
+NEXUS in Applications → **Open** → **Open** (this is only needed once). If it
+still refuses, clear the quarantine flag:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/NEXUS.app
 ```
 
-**Linux** (`NEXUS-linux-x64.tar.gz`) - extract and run the `nexus` binary:
+**Linux** - install the `.deb`; apt resolves the GTK/mpv/libsecret runtime
+libraries as part of the install:
 
 ```bash
-tar -xzf NEXUS-linux-x64.tar.gz
-./NEXUS/nexus
+sudo apt install ./NEXUS-linux-x64.deb
 ```
 
-It's built on the current Ubuntu LTS runner, so it needs a reasonably recent
-glibc/GTK 3. It also needs **libmpv** (the video player backend) and
-**libsecret** (where the pairing token and AI keys are stored) present on the
-system:
+Then launch **NEXUS** from your applications menu, or run `nexus` in a
+terminal. Remove it with `sudo apt remove nexus`.
 
-```bash
-sudo apt install libmpv2 libsecret-1-0    # Debian/Ubuntu
-```
+The `.deb` targets the current Ubuntu LTS. On a non-Debian distro use the
+`.tar.gz` instead - extract it and run `./NEXUS/nexus`, with `libgtk-3`,
+`libmpv`, `libsecret` and `libepoxy` installed from your own package manager.
 
 There's also a **PWA** route on Windows and desktop Chrome/Edge: open the
 GitHub Pages URL and use the address-bar **Install** button (Edge: ⋯ → Apps →
@@ -461,8 +471,8 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-That builds Windows/macOS/Linux, attaches
-`NEXUS-windows-x64.zip`, `NEXUS-macos.zip` and `NEXUS-linux-x64.tar.gz` to a
+That builds Windows/macOS/Linux, attaches `NEXUS-windows-x64-setup.exe`,
+`NEXUS-macos.dmg`, `NEXUS-linux-x64.deb` and `NEXUS-linux-x64.tar.gz` to a
 Release named after the tag, and - because the README's buttons point at
 `releases/latest/download/` - repoints all three download buttons at the new
 build with no README edit. You can also run the workflow by hand from the

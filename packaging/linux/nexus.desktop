@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=NEXUS
+GenericName=Compound Control
+Comment=Map-first control surface for the compound: buildings, cameras, media and AI
+Exec=/opt/nexus/nexus %U
+Icon=nexus
+Terminal=false
+Categories=Utility;Network;AudioVideo;
+Keywords=home;automation;compound;security;media;
+StartupWMClass=nexus
