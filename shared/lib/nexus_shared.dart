@@ -11,6 +11,7 @@ export 'src/demo_seed.dart';
 export 'src/device.dart';
 export 'src/discovery.dart';
 export 'src/empty_seed.dart';
+export 'src/endpoint.dart';
 export 'src/enums.dart';
 export 'src/insight.dart';
 export 'src/insights_engine.dart';

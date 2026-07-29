@@ -144,6 +144,76 @@ Future<bool> confirmDelete(
   return result ?? false;
 }
 
+/// Asks how to reach a real device: which local-HTTP protocol it speaks and
+/// its address. Returning null means "track it in NEXUS but don't try to
+/// control anything" - which is a legitimate choice, not a cancel.
+Future<DeviceEndpoint?> promptForEndpoint(BuildContext context, {String? initialHost}) async {
+  final protocol = await showDialog<DeviceProtocol?>(
+    context: context,
+    builder: (context) => _Sheet(
+      title: 'How does it connect?',
+      subtitle: 'NEXUS talks to these over plain HTTP on your network - no '
+          'cloud account, no vendor login.',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final entry in const {
+            DeviceProtocol.shellyGen1: ('Shelly (gen 1)', 'Shelly 1/2.5/Dimmer'),
+            DeviceProtocol.shellyGen2: ('Shelly (Plus / Pro)', 'Gen 2+ RPC firmware'),
+            DeviceProtocol.tasmota: ('Tasmota', 'Any Tasmota-flashed device'),
+            DeviceProtocol.wled: ('WLED', 'Addressable LED controllers'),
+          }.entries)
+            PressScale(
+              onTap: () => Navigator.of(context).pop(entry.key),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                decoration: BoxDecoration(
+                  color: NexusColors.secondarySurface,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(entry.value.$1, style: NexusText.bodyMedium),
+                    const SizedBox(height: 2),
+                    Text(entry.value.$2, style: NexusText.footnote),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 4),
+          PressScale(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              decoration: BoxDecoration(
+                color: NexusColors.secondarySurface,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Center(
+                child: Text('Skip - just track it', style: NexusText.bodyMedium),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (protocol == null || !context.mounted) return null;
+
+  final host = await promptForName(
+    context,
+    title: 'Device address',
+    subtitle: 'IP or hostname on your network, e.g. 192.168.1.50',
+    initialValue: initialHost ?? '',
+    confirmLabel: 'Save',
+  );
+  if (host == null) return null;
+  return DeviceEndpoint(protocol: protocol, host: host);
+}
+
 class _Sheet extends StatelessWidget {
   const _Sheet({required this.title, this.subtitle, required this.child});
 

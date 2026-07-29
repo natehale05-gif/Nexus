@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:nexus_shared/nexus_shared.dart';
 
+import '../devices/device_driver.dart';
+
 /// Server-side owner of the live [Compound] tree.
 ///
 /// This is the single source of truth the WebSocket hub broadcasts from
@@ -11,11 +13,16 @@ import 'package:nexus_shared/nexus_shared.dart';
 /// grill ignite, etc.) arrives here before being (in a real deployment)
 /// forwarded out to the relevant bridge.
 class ServerCompound {
-  ServerCompound({Compound? seed}) : compound = seed ?? buildDemoCompound() {
+  ServerCompound({Compound? seed, DeviceDriver? driver})
+      : compound = seed ?? buildDemoCompound(),
+        _driver = driver ?? DeviceDriver() {
     _recomputeInsights();
   }
 
   final Compound compound;
+
+  /// Sends the actual HTTP commands to devices that have an endpoint.
+  final DeviceDriver _driver;
   final _changes = StreamController<Compound>.broadcast();
 
   /// Emits the full compound every time something changes. The WebSocket
@@ -23,7 +30,23 @@ class ServerCompound {
   /// connected client (Section 8/9 - "WebSocket state sync first").
   Stream<Compound> get onChange => _changes.stream;
 
-  void dispose() => _changes.close();
+  void dispose() {
+    _driver.close();
+    _changes.close();
+  }
+
+  /// Pushes a command out to the physical device, if this one is wired to any.
+  ///
+  /// Fire-and-forget on purpose: NEXUS's own state has already been updated
+  /// and broadcast, so the UI stays responsive whether or not the device is
+  /// plugged in. A device that's unreachable is an ordinary condition on a
+  /// compound, not an error to fail the command over.
+  void _push(Device device, DeviceRequest? Function(DeviceEndpoint) build) {
+    final endpoint = device.endpoint;
+    if (endpoint == null) return;
+    final request = build(endpoint);
+    if (request != null) unawaited(_driver.send(request));
+  }
 
   T _device<T extends Device>(String id) => compound.devices.firstWhere((d) => d.id == id) as T;
 
@@ -42,12 +65,14 @@ class ServerCompound {
   void toggleLight(String id) => mutate(() {
         final light = _device<LightDevice>(id);
         light.on = !light.on;
+        _push(light, (e) => buildPowerRequest(e, light.on));
       });
 
   void setBrightness(String id, num value) => mutate(() {
         final light = _device<LightDevice>(id);
         light.brightness = value.round().clamp(0, 100);
         if (light.brightness > 0) light.on = true;
+        _push(light, (e) => buildBrightnessRequest(e, light.brightness));
       });
 
   void setClimateMode(String id, ClimateMode mode) => mutate(() {
@@ -92,6 +117,7 @@ class ServerCompound {
       });
 
   void setMediaOn(String id, bool on) => mutate(() {
+        _push(_device<MediaDevice>(id), (e) => buildPowerRequest(e, on));
         _device<MediaDevice>(id).on = on;
       });
 
@@ -102,6 +128,9 @@ class ServerCompound {
       });
 
   void turnOffAllLights() => mutate(() {
+        for (final light in compound.devices.whereType<LightDevice>()) {
+          if (light.on) _push(light, (e) => buildPowerRequest(e, false));
+        }
         for (final device in compound.devices.whereType<LightDevice>()) {
           device.on = false;
         }

@@ -1,3 +1,4 @@
+import 'endpoint.dart';
 import 'enums.dart';
 
 /// Sealed base class for every controllable accessory in the compound.
@@ -11,6 +12,7 @@ sealed class Device {
     required this.name,
     required this.buildingId,
     this.roomId,
+    this.endpoint,
   });
 
   final String id;
@@ -21,6 +23,11 @@ sealed class Device {
   /// room - this is always the case for [LockDevice]s (locks/gates attach to
   /// the building itself per Section 3/7).
   final String? roomId;
+
+  /// Where the real hardware is, when there is any. Null means the device is
+  /// tracked in the compound but not wired to anything - mutations then only
+  /// update NEXUS's own state, which is what the demo compound does.
+  DeviceEndpoint? endpoint;
 
   DeviceType get type;
 
@@ -49,6 +56,7 @@ class LightDevice extends Device {
     required super.name,
     required super.buildingId,
     super.roomId,
+    super.endpoint,
     this.on = false,
     this.brightness = 100,
   });
@@ -68,6 +76,7 @@ class LightDevice extends Device {
         'name': name,
         'buildingId': buildingId,
         'roomId': roomId,
+        'endpoint': endpoint?.toJson(),
         'on': on,
         'brightness': brightness,
       };
@@ -77,6 +86,7 @@ class LightDevice extends Device {
         name: json['name'] as String,
         buildingId: json['buildingId'] as String,
         roomId: json['roomId'] as String?,
+        endpoint: DeviceEndpoint.fromJson(json['endpoint'] as Map<String, dynamic>?),
         on: json['on'] as bool? ?? false,
         brightness: json['brightness'] as int? ?? 100,
       );
@@ -88,6 +98,7 @@ class ClimateDevice extends Device {
     required super.name,
     required super.buildingId,
     super.roomId,
+    super.endpoint,
     this.temp = 68,
     this.set = 70,
     this.mode = ClimateMode.off,
@@ -118,6 +129,7 @@ class ClimateDevice extends Device {
         'name': name,
         'buildingId': buildingId,
         'roomId': roomId,
+        'endpoint': endpoint?.toJson(),
         'temp': temp,
         'set': set,
         'mode': mode.name,
@@ -130,6 +142,7 @@ class ClimateDevice extends Device {
         name: json['name'] as String,
         buildingId: json['buildingId'] as String,
         roomId: json['roomId'] as String?,
+        endpoint: DeviceEndpoint.fromJson(json['endpoint'] as Map<String, dynamic>?),
         temp: (json['temp'] as num?)?.toDouble() ?? 68,
         set: (json['set'] as num?)?.toDouble() ?? 70,
         mode: ClimateMode.values.byName(json['mode'] as String? ?? 'off'),
@@ -144,6 +157,7 @@ class GrillDevice extends Device {
     required super.name,
     required super.buildingId,
     super.roomId,
+    super.endpoint,
     this.on = false,
     this.temp = 72,
     this.set = 225,
@@ -186,6 +200,7 @@ class GrillDevice extends Device {
         'name': name,
         'buildingId': buildingId,
         'roomId': roomId,
+        'endpoint': endpoint?.toJson(),
         'on': on,
         'temp': temp,
         'set': set,
@@ -200,6 +215,7 @@ class GrillDevice extends Device {
         name: json['name'] as String,
         buildingId: json['buildingId'] as String,
         roomId: json['roomId'] as String?,
+        endpoint: DeviceEndpoint.fromJson(json['endpoint'] as Map<String, dynamic>?),
         on: json['on'] as bool? ?? false,
         temp: (json['temp'] as num?)?.toDouble() ?? 72,
         set: (json['set'] as num?)?.toDouble() ?? 225,
@@ -215,6 +231,7 @@ class LockDevice extends Device {
     required super.id,
     required super.name,
     required super.buildingId,
+    super.endpoint,
     this.locked = true,
     this.isGate = false,
     this.openSince,
@@ -241,6 +258,7 @@ class LockDevice extends Device {
         'name': name,
         'buildingId': buildingId,
         'roomId': roomId,
+        'endpoint': endpoint?.toJson(),
         'locked': locked,
         'isGate': isGate,
         'openSince': openSince?.toIso8601String(),
@@ -250,6 +268,7 @@ class LockDevice extends Device {
         id: json['id'] as String,
         name: json['name'] as String,
         buildingId: json['buildingId'] as String,
+        endpoint: DeviceEndpoint.fromJson(json['endpoint'] as Map<String, dynamic>?),
         locked: json['locked'] as bool? ?? true,
         isGate: json['isGate'] as bool? ?? false,
         openSince: json['openSince'] == null
@@ -264,6 +283,7 @@ class MediaDevice extends Device {
     required super.name,
     required super.buildingId,
     super.roomId,
+    super.endpoint,
     this.on = false,
   });
 
@@ -279,6 +299,7 @@ class MediaDevice extends Device {
         'name': name,
         'buildingId': buildingId,
         'roomId': roomId,
+        'endpoint': endpoint?.toJson(),
         'on': on,
       };
 
@@ -287,6 +308,7 @@ class MediaDevice extends Device {
         name: json['name'] as String,
         buildingId: json['buildingId'] as String,
         roomId: json['roomId'] as String?,
+        endpoint: DeviceEndpoint.fromJson(json['endpoint'] as Map<String, dynamic>?),
         on: json['on'] as bool? ?? false,
       );
 }

@@ -138,14 +138,19 @@ class CompoundStore extends NexusDataSource {
     required String name,
     required String buildingId,
     String? roomId,
+    DeviceEndpoint? endpoint,
   }) {
     final id = _slug(name, compound.devices.map((d) => d.id));
     final device = switch (type) {
-      DeviceType.light => LightDevice(id: id, name: name, buildingId: buildingId, roomId: roomId),
-      DeviceType.climate => ClimateDevice(id: id, name: name, buildingId: buildingId, roomId: roomId),
-      DeviceType.grill => GrillDevice(id: id, name: name, buildingId: buildingId, roomId: roomId),
-      DeviceType.media => MediaDevice(id: id, name: name, buildingId: buildingId, roomId: roomId),
-      DeviceType.lock => LockDevice(id: id, name: name, buildingId: buildingId),
+      DeviceType.light =>
+        LightDevice(id: id, name: name, buildingId: buildingId, roomId: roomId, endpoint: endpoint),
+      DeviceType.climate =>
+        ClimateDevice(id: id, name: name, buildingId: buildingId, roomId: roomId, endpoint: endpoint),
+      DeviceType.grill =>
+        GrillDevice(id: id, name: name, buildingId: buildingId, roomId: roomId, endpoint: endpoint),
+      DeviceType.media =>
+        MediaDevice(id: id, name: name, buildingId: buildingId, roomId: roomId, endpoint: endpoint),
+      DeviceType.lock => LockDevice(id: id, name: name, buildingId: buildingId, endpoint: endpoint),
     };
     addDevice(device);
     return device;

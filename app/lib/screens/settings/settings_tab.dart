@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../../ai/ai_provider.dart';
 import '../../ai/ai_settings.dart';
 import '../../ai/provider_registry.dart';
+import '../../ai/providers/mac_studio_provider.dart';
 import '../../state/ai_scope.dart';
 import '../../state/app_mode.dart';
 import '../../state/compound_scope.dart';
@@ -45,6 +46,8 @@ class _SettingsTabState extends State<SettingsTab> {
   final _ionTokenController = TextEditingController();
   final _ionTokenFocus = FocusNode();
   bool _ionSaved = true;
+  List<String>? _ollamaModels;
+  bool _probingOllama = false;
   final _aiModelFocus = FocusNode();
   final _aiKeyFocus = FocusNode();
   final _aiUrlFocus = FocusNode();
@@ -120,6 +123,24 @@ class _SettingsTabState extends State<SettingsTab> {
         _ => '',
       };
       _aiUrlController.text = kind == AiProviderKind.macStudio ? (stored.macStudioUrl ?? '') : '';
+    });
+  }
+
+  /// Asks the configured Ollama what it actually has installed. Typing a
+  /// model name blind is the main way this goes wrong - a wrong name comes
+  /// back as an opaque 404 at chat time.
+  Future<void> _probeOllama() async {
+    final url = _aiUrlController.text.trim().isEmpty
+        ? 'http://127.0.0.1:11434'
+        : _aiUrlController.text.trim();
+    setState(() => _probingOllama = true);
+    final models = await MacStudioProvider.listModels(url);
+    if (!mounted) return;
+    setState(() {
+      _ollamaModels = models;
+      _probingOllama = false;
+      // Fill in the URL we actually probed, so the default isn't invisible.
+      if (_aiUrlController.text.trim().isEmpty) _aiUrlController.text = url;
     });
   }
 
@@ -705,15 +726,69 @@ class _SettingsTabState extends State<SettingsTab> {
             ],
             if (_aiKind == AiProviderKind.macStudio) ...[
               const SizedBox(height: 16),
-              Text('Mac Studio URL', style: NexusText.footnote),
+              Text('Ollama URL', style: NexusText.footnote),
               const SizedBox(height: 6),
               _SettingsField(
                 controller: _aiUrlController,
                 focusNode: _aiUrlFocus,
-                onChanged: (_) => setState(() => _aiSaved = false),
+                onChanged: (_) => setState(() {
+                  _aiSaved = false;
+                  // The detected list belongs to the old URL.
+                  _ollamaModels = null;
+                }),
               ),
               const SizedBox(height: 4),
-              Text('e.g. http://100.x.y.z:11434 (Tailscale) or http://192.168.1.50:11434', style: NexusText.footnote),
+              Text(
+                'http://127.0.0.1:11434 runs the model on this machine - fully '
+                'local, no API key. A Tailscale or LAN address uses another box.',
+                style: NexusText.footnote,
+              ),
+              const SizedBox(height: 12),
+              PressScale(
+                onTap: _probingOllama ? () {} : _probeOllama,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  decoration: BoxDecoration(
+                    color: NexusColors.secondarySurface,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _probingOllama ? 'Checking…' : 'Detect installed models',
+                      style: NexusText.bodyMedium,
+                    ),
+                  ),
+                ),
+              ),
+              if (_ollamaModels != null) ...[
+                const SizedBox(height: 10),
+                if (_ollamaModels!.isEmpty)
+                  Text(
+                    'No Ollama answered there. Install it from ollama.com, run '
+                    '`ollama pull llama3.1`, and check again.',
+                    style: NexusText.footnote.copyWith(color: NexusColors.red),
+                  )
+                else ...[
+                  Text('Installed - tap to use', style: NexusText.footnote),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final model in _ollamaModels!)
+                        _AiProviderChip(
+                          label: model,
+                          selected: _aiModelController.text == model,
+                          onTap: () => setState(() {
+                            _aiModelController.text = model;
+                            _aiSaved = false;
+                          }),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
             ],
             if (isKeyProvider) ...[
               const SizedBox(height: 16),

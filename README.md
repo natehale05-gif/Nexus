@@ -416,6 +416,32 @@ streaming still works. To try offline downloads, run a native build (a
 phone, or `flutter run -d macos`), download a title, then stop the server
 or go offline and confirm it still plays.
 
+### Controlling real hardware
+
+A device in NEXUS can carry an **endpoint** - the protocol and address of the
+actual hardware. When it does, toggling a light in the app sends a real HTTP
+request; when it doesn't, the device is still tracked but only NEXUS's own
+state changes (which is what the demo compound does).
+
+Supported protocols, all unauthenticated local HTTP - no cloud account, no
+vendor OAuth:
+
+| Protocol | Power | Brightness |
+|---|---|---|
+| Shelly gen 1 | `/relay/N?turn=on` | `/light/N?brightness=0-100` |
+| Shelly Plus/Pro | `/rpc/Switch.Set?id=N&on=true` | `/rpc/Light.Set?...&brightness=0-100` |
+| Tasmota | `/cm?cmnd=Power On` | `/cm?cmnd=Dimmer 0-100` |
+| WLED | `POST /json/state {"on":true}` | `bri` 0-255 |
+
+Brightness is a 0-100 percentage everywhere in NEXUS and converted per
+protocol at the edge (WLED's 0-255 being the odd one out). 0% turns the light
+off rather than leaving a dimmer sitting at its floor.
+
+Sends are **fire-and-forget**: NEXUS updates and broadcasts its own state
+first, so the UI never blocks on hardware, and a device being unplugged is an
+ordinary condition rather than a failed command. Zigbee and Z-Wave devices
+reach NEXUS through a hub that itself speaks one of the protocols above.
+
 ### Finding devices on your network
 
 **Buildings → Find devices on my network** asks the server to scan and lists
@@ -475,6 +501,20 @@ The Home map remains the spatial view (where things are); Buildings is the
 working view (operating a building room by room).
 
 ## Multi-provider AI (NEXUS tab)
+
+**For a genuinely local model, use the Ollama provider pointed at
+`http://127.0.0.1:11434`.** That's real local inference on the machine running
+NEXUS - no API key, no cloud. **Settings → AI Model → Detect installed
+models** asks that Ollama what it actually has (`GET /api/tags`) and lets you
+pick from the list, rather than typing a name blind and getting an opaque 404
+at chat time. The same provider handles a remote Ollama over Tailscale; only
+the URL differs.
+
+The **On-device** provider is *not* a neural model - it's a rule-based
+responder that works fully offline and knows the house state. Real on-device
+inference (llama.cpp/MLX via FFI) is a per-platform native effort that isn't
+built here; Ollama on localhost is the working answer today.
+
 
 The NEXUS AI tab routes chat through a pluggable provider abstraction
 (`app/lib/ai/`) so each device can pick its own backend, streamed token by

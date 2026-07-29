@@ -156,13 +156,15 @@ class _BuildingsTabState extends State<BuildingsTab> {
       title: 'Name this device',
       subtitle: room == null ? building.name : '${building.name} · ${room.name}',
     );
-    if (name == null) return;
+    if (name == null || !mounted) return;
+    final endpoint = await promptForEndpoint(context);
     store.addDeviceOfType(
       type: type,
       name: name,
       buildingId: building.id,
       // Locks ignore roomId anyway, but pass null so the intent is explicit.
       roomId: type == DeviceType.lock ? null : room?.id,
+      endpoint: endpoint,
     );
   }
 
@@ -179,8 +181,16 @@ class _BuildingsTabState extends State<BuildingsTab> {
       subtitle: 'Found at ${device.address} - name it and it joins ${building.name}.',
       initialValue: device.name,
     );
-    if (name == null) return;
-    store.addDeviceOfType(type: type, name: name, buildingId: building.id);
+    if (name == null || !mounted) return;
+    // Pre-fill the address discovery already found - that's the whole point of
+    // having scanned.
+    final endpoint = await promptForEndpoint(context, initialHost: device.address);
+    store.addDeviceOfType(
+      type: type,
+      name: name,
+      buildingId: building.id,
+      endpoint: endpoint,
+    );
   }
 
   Future<void> _renameBuilding(CompoundStore store, Building building) async {

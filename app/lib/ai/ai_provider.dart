@@ -14,7 +14,9 @@ extension AiProviderKindLabel on AiProviderKind {
 
   String get label => switch (this) {
         AiProviderKind.local => 'On-device',
-        AiProviderKind.macStudio => 'Mac Studio (Ollama)',
+        // The id stays `mac_studio` for settings already on disk; the label
+        // reflects that this is any Ollama, including one on this machine.
+        AiProviderKind.macStudio => 'Ollama (local or remote)',
         AiProviderKind.anthropic => 'Anthropic',
         AiProviderKind.openai => 'OpenAI',
       };
