@@ -33,6 +33,13 @@ on:
 permissions:
   contents: read
 
+# Three desktop runners per push is expensive, and a superseded branch build
+# is worthless - so a newer push on the same ref cancels the older run. Tag
+# runs are exempt: those publish a Release and must always finish.
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 env:
   # Must be a Flutter whose `flutter build windows` knows the Visual Studio
   # 2026 (major 18) CMake generator - windows-latest is now the
