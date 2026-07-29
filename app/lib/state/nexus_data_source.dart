@@ -63,6 +63,14 @@ abstract class NexusDataSource extends ChangeNotifier {
   /// No-op in local-demo-mode (nothing to scan).
   void rescanLibrary();
 
+  /// Scans the network for devices that aren't in the compound yet.
+  ///
+  /// Only a paired server can do this - it's the thing actually sitting on
+  /// the LAN, while the app is often remote (Tailscale) or on web (no raw
+  /// UDP at all). Local/demo modes return an empty list rather than
+  /// pretending to scan.
+  Future<List<DiscoveredDevice>> discoverDevices() async => const [];
+
   /// The URL to stream [itemId]'s file from, or null if there's no real
   /// server to stream from (local-demo-mode) - callers should fall back to
   /// a placeholder rather than attempting playback.

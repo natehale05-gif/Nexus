@@ -15,6 +15,9 @@ dependencies:
   web_socket_channel: ^3.0.1
   crypto: ^3.0.7
   path: ^1.9.1
+  # mDNS/DNS-SD discovery (Bonjour). Dart-team package - unlike SSDP's
+  # plain-text headers, mDNS is binary DNS and not worth hand-rolling.
+  multicast_dns: ^0.3.2
 
 dev_dependencies:
   lints: ^4.0.0

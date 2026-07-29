@@ -7,6 +7,7 @@ import 'package:shelf_router/shelf_router.dart';
 import '../auth/pairing_token.dart';
 import '../integrations/ollama_bridge.dart';
 import '../media/library_index.dart';
+import '../discovery/discovery_service.dart';
 import '../media/stream_token.dart';
 import '../state/server_compound.dart';
 import 'command_dispatcher.dart';
@@ -21,6 +22,8 @@ import 'command_dispatcher.dart';
 ///   command (same names/args as the WebSocket `command` message)
 /// - `POST /chat`                 -> body `{"message": "..."}`, returns
 ///   `{"message": "<assistant reply>"}`
+/// - `GET  /discovery/scan?seconds=<1-15>` -> devices seen on the LAN that
+///   aren't in the compound yet (mDNS + SSDP).
 /// - `GET  /media/stream/<id>?token=<perItemToken>` -> the library item's
 ///   file, with HTTP range-request support (206 Partial Content) so seeking
 ///   works. Authenticated separately from everything else here - see
@@ -28,13 +31,21 @@ import 'command_dispatcher.dart';
 ///   can't reliably attach the usual `Authorization` header to range
 ///   requests.
 class RestApi {
-  RestApi(this.server, this.dispatcher, this.ollama, this.library, this.pairingToken);
+  RestApi(
+    this.server,
+    this.dispatcher,
+    this.ollama,
+    this.library,
+    this.pairingToken, {
+    DiscoveryService? discovery,
+  }) : discovery = discovery ?? DiscoveryService();
 
   final ServerCompound server;
   final CommandDispatcher dispatcher;
   final OllamaBridge ollama;
   final LibraryIndex library;
   final PairingToken pairingToken;
+  final DiscoveryService discovery;
 
   Handler get handler {
     final router = Router();
@@ -54,6 +65,25 @@ class RestApi {
       } on ArgumentError catch (error) {
         return Response(400, body: jsonEncode({'error': '$error'}), headers: _json);
       }
+    });
+
+    // Scans the LAN for devices that aren't in the compound yet. Runs on the
+    // server because that's what's actually on the network - the app is often
+    // remote over Tailscale, where multicast doesn't reach.
+    router.get('/discovery/scan', (Request request) async {
+      final seconds = int.tryParse(request.url.queryParameters['seconds'] ?? '') ?? 4;
+      final found = await discovery.scan(
+        // Bounded so a caller can't pin the server in a long multicast loop.
+        timeout: Duration(seconds: seconds.clamp(1, 15)),
+      );
+      // Anything already in the compound is filtered out here rather than in
+      // the app, so every client gets the same answer.
+      final knownNames = server.compound.devices.map((d) => d.name.toLowerCase()).toSet();
+      final fresh = found.where((d) => !knownNames.contains(d.name.toLowerCase()));
+      return Response.ok(
+        jsonEncode({'devices': fresh.map((d) => d.toJson()).toList()}),
+        headers: _json,
+      );
     });
 
     router.post('/chat', (Request request) async {

@@ -2,7 +2,6 @@ import '../state/server_compound.dart';
 import 'ecobee_bridge.dart';
 import 'frigate_bridge.dart';
 import 'gate_gpio_bridge.dart';
-import 'jellyfin_bridge.dart';
 import 'meshtastic_bridge.dart';
 import 'ollama_bridge.dart';
 import 'traeger_bridge.dart';
@@ -22,7 +21,6 @@ class IntegrationsManager {
         ecobee = EcobeeBridge(server),
         meshtastic = MeshtasticBridge(server),
         gateGpio = GateGpioBridge(server),
-        jellyfin = JellyfinBridge(server),
         ollama = OllamaBridge(server),
         frigate = FrigateBridge(server),
         unifi = UniFiBridge(server),
@@ -34,14 +32,13 @@ class IntegrationsManager {
   final EcobeeBridge ecobee;
   final MeshtasticBridge meshtastic;
   final GateGpioBridge gateGpio;
-  final JellyfinBridge jellyfin;
   final OllamaBridge ollama;
   final FrigateBridge frigate;
   final UniFiBridge unifi;
   final TraegerBridge traeger;
 
   Future<void> startAll() async {
-    for (final bridge in [wifi, zigbee, zwave, ecobee, meshtastic, gateGpio, jellyfin, frigate, unifi]) {
+    for (final bridge in [wifi, zigbee, zwave, ecobee, meshtastic, gateGpio, frigate, unifi]) {
       await bridge.start();
     }
     await ollama.start();
@@ -49,7 +46,7 @@ class IntegrationsManager {
   }
 
   Future<void> stopAll() async {
-    for (final bridge in [wifi, zigbee, zwave, ecobee, meshtastic, gateGpio, jellyfin, ollama, frigate, unifi, traeger]) {
+    for (final bridge in [wifi, zigbee, zwave, ecobee, meshtastic, gateGpio, ollama, frigate, unifi, traeger]) {
       await bridge.stop();
     }
   }

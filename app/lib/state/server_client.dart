@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:http/http.dart' as http;
+
 import 'package:crypto/crypto.dart';
 import 'package:nexus_shared/nexus_shared.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -245,6 +247,27 @@ class ServerClient extends NexusDataSource {
 
   @override
   void rescanLibrary() => _send('rescanLibrary', const {});
+
+  @override
+  Future<List<DiscoveredDevice>> discoverDevices() async {
+    final uri = _restBaseUri().replace(
+      path: '/discovery/scan',
+      queryParameters: {'seconds': '5'},
+    );
+    // Longer than the server's own scan window so a slow LAN doesn't look
+    // like a failure from here.
+    final response = await http
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(const Duration(seconds: 25));
+    if (response.statusCode != 200) {
+      throw StateError('Scan failed (${response.statusCode})');
+    }
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    return [
+      for (final device in decoded['devices'] as List<dynamic>)
+        DiscoveredDevice.fromJson(device as Map<String, dynamic>),
+    ];
+  }
 
   @override
   void turnOffAllLights() => _send('turnOffAllLights', const {});

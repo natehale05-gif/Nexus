@@ -6,7 +6,9 @@ import '../../state/compound_scope.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 import '../../state/compound_store.dart';
+import '../../state/nexus_data_source.dart';
 import '../../widgets/edit_prompts.dart';
+import 'discover_sheet.dart';
 import '../../widgets/press_scale.dart';
 import '../../widgets/status_pill.dart';
 import '../building/building_status.dart';
@@ -164,6 +166,23 @@ class _BuildingsTabState extends State<BuildingsTab> {
     );
   }
 
+  /// Adds a device the server found on the network. The scan proposes a name
+  /// and type; the user confirms both, because discovery knows a Chromecast
+  /// exists but not that you call it "Living Room TV".
+  Future<void> _discover(CompoundStore store, Building building, NexusDataSource source) async {
+    final pick = await showDiscoverySheet(context, source);
+    if (pick == null || !mounted) return;
+    final (device, type) = pick;
+    final name = await promptForName(
+      context,
+      title: 'Add ${device.name}',
+      subtitle: 'Found at ${device.address} - name it and it joins ${building.name}.',
+      initialValue: device.name,
+    );
+    if (name == null) return;
+    store.addDeviceOfType(type: type, name: name, buildingId: building.id);
+  }
+
   Future<void> _renameBuilding(CompoundStore store, Building building) async {
     final name = await promptForName(
       context,
@@ -275,6 +294,11 @@ class _BuildingsTabState extends State<BuildingsTab> {
         _AddButton(
           label: 'Add a lock or gate',
           onTap: () => _addDevice(editor, building, null),
+        ),
+        const SizedBox(height: 10),
+        _AddButton(
+          label: 'Find devices on my network',
+          onTap: () => _discover(editor, building, CompoundScope.of(context)),
         ),
         const SizedBox(height: 22),
         Row(

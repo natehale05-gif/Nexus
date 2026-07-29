@@ -3,7 +3,7 @@ import '../state/server_compound.dart';
 /// Common lifecycle for every protocol bridge listed in Section 8.
 ///
 /// **Why these are stubs:** this environment has no real Zigbee2MQTT/
-/// Z-Wave JS UI/Frigate/UniFi/Jellyfin/Ollama instances, no Traeger
+/// Z-Wave JS UI/Frigate/UniFi/Ollama instances, no Traeger
 /// account credentials, and no physical mesh/GPIO hardware to bridge to.
 /// Rather than faking a protocol implementation that would silently do
 /// nothing useful (or worse, look real and mislead whoever wires this up

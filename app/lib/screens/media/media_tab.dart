@@ -66,7 +66,7 @@ class _MediaTabState extends State<MediaTab> {
           color: NexusColors.background,
           child: Column(
             children: [
-              const TabHeader(title: 'Media', pillLabel: 'Jellyfin', pillColor: NexusColors.purple),
+              const TabHeader(title: 'Media', pillLabel: 'Library', pillColor: NexusColors.purple),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),

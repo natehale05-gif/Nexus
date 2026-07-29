@@ -3,10 +3,12 @@
 NEXUS is the single control surface for a 50+ acre compound near Corvallis,
 OR: a map-first Flutter app talking to a companion Dart server that bridges
 every local protocol (WiFi, Zigbee, Z-Wave, Meshtastic mesh, gate GPIO),
-**replaces Jellyfin/Plex outright** with its own media library scanner +
-streamer (not a bridge to an external Jellyfin instance), and adds a handful
-of other integrations (Ollama, Frigate, UniFi, and - the one that's
-inherently cloud-gated - Traeger).
+and adds a handful of other integrations (Ollama, Frigate, UniFi, and - the
+one that's inherently cloud-gated - Traeger).
+
+**NEXUS is its own media server.** It scans your library, serves it over HTTP
+range requests, and plays it back - it does not talk to Jellyfin or Plex, and
+there is no Jellyfin code in this repo. Same capabilities, one app.
 
 ## Download
 
@@ -387,6 +389,30 @@ offline) - the download affordances simply don't appear there, while online
 streaming still works. To try offline downloads, run a native build (a
 phone, or `flutter run -d macos`), download a title, then stop the server
 or go offline and confirm it still plays.
+
+### Finding devices on your network
+
+**Buildings → Find devices on my network** asks the server to scan and lists
+what it found:
+
+- **mDNS / DNS-SD** (Bonjour) via `multicast_dns` - Chromecast, AirPlay,
+  HomeKit, Hue bridges, Ollama, printers.
+- **SSDP / UPnP** - Sonos, Roku, smart TVs, media renderers. Hand-rolled,
+  since it's plain-text headers over UDP.
+
+`GET /discovery/scan?seconds=<1-15>` runs both concurrently, merges devices
+that answered on both protocols (a Sonos answers both, and would otherwise
+appear twice), and drops anything already in your compound.
+
+The scan runs **on the server, not in the app**. The server is what's actually
+on the LAN; the app is often remote over Tailscale - where multicast doesn't
+reach - or on web, where raw UDP isn't available at all. Scanning server-side
+means "find devices" works from any paired device.
+
+Nothing is imported automatically. Discovery can tell you a Chromecast exists;
+it can't tell you which room it's in or what you call it, so you confirm the
+name and type before anything joins the compound. Unrecognized devices are
+still listed - they just don't claim a type.
 
 ### Security cameras
 
