@@ -10,6 +10,7 @@ import '../../state/connection_scope.dart';
 import '../../state/connection_settings.dart';
 import '../../state/map_settings.dart';
 import '../../state/nexus_data_source.dart';
+import '../../state/update_scope.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/press_scale.dart';
@@ -171,9 +172,10 @@ class _SettingsTabState extends State<SettingsTab> {
     final connectionScope = ConnectionScope.of(context);
     final store = CompoundScope.of(context);
     final registry = AiScope.of(context);
+    final updates = UpdateScope.of(context);
 
     return AnimatedBuilder(
-      animation: Listenable.merge([store, registry]),
+      animation: Listenable.merge([store, registry, updates]),
       builder: (context, _) {
         final (statusLabel, statusColor) = switch (store.connectionStatus) {
           ConnectionStatus.demo => ('Local Demo Mode', NexusColors.textMuted),
@@ -326,6 +328,7 @@ class _SettingsTabState extends State<SettingsTab> {
                       ),
                     ],
                     const SizedBox(height: 20),
+                    ..._updateSection(UpdateScope.of(context)),
                     ..._modeSection(connectionScope),
                     ..._mapSection(),
                     ..._aiSection(registry),
@@ -345,6 +348,87 @@ class _SettingsTabState extends State<SettingsTab> {
   /// Lets someone move between the demo, their own local compound, and a
   /// paired server after first run - the onboarding screen promises this is
   /// changeable, so it has to actually be reachable.
+  /// Version + update state. Desktop can install the update itself; web
+  /// updates by reloading, and mobile goes through the app stores, so the
+  /// button only appears where it does something.
+  List<Widget> _updateSection(UpdateController updates) {
+    final update = updates.available;
+    return [
+      Text('Version', style: NexusText.footnote),
+      const SizedBox(height: 10),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('NEXUS ${updates.currentVersion}', style: NexusText.bodyMedium),
+                const Spacer(),
+                if (updates.checking)
+                  Text('Checking…', style: NexusText.footnote)
+                else if (update != null)
+                  StatusPill(label: '${update.version} available', color: NexusColors.blue)
+                else
+                  Text('Up to date', style: NexusText.footnote),
+              ],
+            ),
+            if (updates.error != null) ...[
+              const SizedBox(height: 10),
+              Text(updates.error!, style: NexusText.footnote.copyWith(color: NexusColors.red)),
+            ],
+            const SizedBox(height: 14),
+            if (update != null && update.assetUrl != null && updates.canSelfInstall)
+              PressScale(
+                onTap: updates.installing ? () {} : updates.install,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(color: NexusColors.blue, borderRadius: BorderRadius.circular(14)),
+                  child: Center(
+                    child: Text(
+                      updates.installing ? 'Downloading…' : 'Download and install ${update.version}',
+                      style: NexusText.headline.copyWith(color: const Color(0xFFFFFFFF)),
+                    ),
+                  ),
+                ),
+              )
+            else
+              PressScale(
+                onTap: updates.checking ? () {} : updates.check,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    color: NexusColors.secondarySurface,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(child: Text('Check for updates', style: NexusText.bodyMedium)),
+                ),
+              ),
+            if (update != null && update.assetUrl == null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Version ${update.version} is out, but this release has no installer for '
+                'this platform - grab it from the releases page.',
+                style: NexusText.footnote,
+              ),
+            ],
+            if (updates.currentVersion.endsWith('-dev')) ...[
+              const SizedBox(height: 8),
+              Text(
+                'This is a local build, so update checks are skipped.',
+                style: NexusText.footnote,
+              ),
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
   List<Widget> _modeSection(ConnectionScope scope) {
     const copy = {
       AppMode.server: 'Paired with a server. It owns the compound, media and cameras.',

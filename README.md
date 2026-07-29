@@ -125,6 +125,30 @@ The `.deb` targets the current Ubuntu LTS. On a non-Debian distro use the
 `.tar.gz` instead - extract it and run `./NEXUS/nexus`, with `libgtk-3`,
 `libmpv`, `libsecret` and `libepoxy` installed from your own package manager.
 
+### Updates
+
+The desktop apps check GitHub Releases on launch and offer the new version in
+**Settings → Version**. On Windows, macOS and Linux, *Download and install*
+fetches the right asset for the platform and hands it to the OS - the Inno
+Setup installer, the `.dmg`, or the `.deb`. The web build has nothing to
+download; reloading always serves the newest deploy.
+
+The check is deliberately conservative:
+
+- It **stops at launching the installer** rather than swapping files under the
+  running app. A running `.exe` can't be overwritten on Windows, and silently
+  replacing an unsigned binary is the exact behavior SmartScreen and Smart App
+  Control exist to stop - so you stay in the loop, and the prompt makes sense
+  when SAC blocks it.
+- A failed check is **silent**. Offline, rate-limited, or a malformed
+  response all mean "no update this time", never an error dialog.
+- Local builds (`flutter run`) report version `0.0.0-dev` and never check, so
+  a working copy doesn't nag. CI stamps the real version in from the release
+  tag via `--dart-define=NEXUS_VERSION`.
+
+Because the installers are unsigned, **each update re-triggers the same
+first-run warnings** as the original install. Signing fixes that too.
+
 ### Code signing
 
 Nothing in this repo is signed, which is why Windows and macOS both push

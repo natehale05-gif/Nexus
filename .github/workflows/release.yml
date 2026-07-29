@@ -105,8 +105,14 @@ jobs:
         run: flutter pub get
         working-directory: app
 
+      # NEXUS_VERSION is what the in-app update check compares against the
+      # newest GitHub release; a build without it stays on the dev sentinel
+      # and never offers updates.
       - name: Build ${{ matrix.platform }} (release)
-        run: flutter build ${{ matrix.platform }} --release
+        run: >
+          flutter build ${{ matrix.platform }} --release
+          --build-name=${{ steps.ver.outputs.version }}
+          --dart-define=NEXUS_VERSION=${{ steps.ver.outputs.version }}
         working-directory: app
 
       # Inno Setup ships on the windows runner images, but install it if the

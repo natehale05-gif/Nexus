@@ -13,6 +13,7 @@ import 'state/connection_settings.dart';
 import 'state/download_manager.dart';
 import 'state/download_scope.dart';
 import 'state/nexus_data_source.dart';
+import 'state/update_scope.dart';
 import 'state/server_client.dart';
 import 'theme/app_theme.dart';
 import 'screens/nexus_ai/chat_engine.dart';
@@ -37,6 +38,7 @@ class _NexusAppState extends State<NexusApp> {
   final _settings = ConnectionSettings();
   final _modeSettings = AppModeSettings();
   final _downloads = DownloadManager();
+  final _updates = UpdateController();
   late NexusDataSource _store = _createInitialDataSource();
   StoredConnection? _current;
 
@@ -86,13 +88,21 @@ class _NexusAppState extends State<NexusApp> {
     _downloads.load();
     // Load this device's preferred AI provider/model + keys.
     _ai.load();
+    // Look for a newer release in the background. No-ops on dev builds and
+    // fails silently, so it can never block or interrupt startup.
+    _updates.check();
   }
 
   /// Reads the saved mode and, for a local compound, the saved compound with
   /// it. The `?server=` override implies server mode without asking.
   Future<void> _restoreMode() async {
     if (_store is ServerClient) {
-      if (mounted) setState(() { _mode = AppMode.server; _modeResolved = true; });
+      if (mounted) {
+        setState(() {
+          _mode = AppMode.server;
+          _modeResolved = true;
+        });
+      }
       return;
     }
     final mode = await _modeSettings.load();
@@ -110,11 +120,8 @@ class _NexusAppState extends State<NexusApp> {
 
   /// A store over the user's own compound: no simulation ticker, and every
   /// change written straight back to disk.
-  CompoundStore _localStore(Compound? seed) => CompoundStore(
-        seed: seed ?? buildEmptyCompound(),
-        simulate: false,
-        onPersist: saveCompound,
-      );
+  CompoundStore _localStore(Compound? seed) =>
+      CompoundStore(seed: seed ?? buildEmptyCompound(), simulate: false, onPersist: saveCompound);
 
   Future<void> _chooseMode(AppMode mode) async {
     await _modeSettings.save(mode);
@@ -145,7 +152,10 @@ class _NexusAppState extends State<NexusApp> {
       return;
     }
     if (stored != null && mounted) {
-      _switchTo(ServerClient(hostOrUrl: stored.serverAddress, token: stored.token), current: stored);
+      _switchTo(
+        ServerClient(hostOrUrl: stored.serverAddress, token: stored.token),
+        current: stored,
+      );
     }
   }
 
@@ -162,7 +172,10 @@ class _NexusAppState extends State<NexusApp> {
     await _settings.save(connection);
     await _modeSettings.save(AppMode.server);
     if (mounted) setState(() => _mode = AppMode.server);
-    _switchTo(ServerClient(hostOrUrl: connection.serverAddress, token: connection.token), current: connection);
+    _switchTo(
+      ServerClient(hostOrUrl: connection.serverAddress, token: connection.token),
+      current: connection,
+    );
   }
 
   Future<void> _forget() async {
@@ -176,6 +189,7 @@ class _NexusAppState extends State<NexusApp> {
   void dispose() {
     _store.dispose();
     _downloads.dispose();
+    _updates.dispose();
     _ai.dispose();
     super.dispose();
   }
@@ -188,19 +202,22 @@ class _NexusAppState extends State<NexusApp> {
       onForget: _forget,
       mode: _mode,
       onChooseMode: _chooseMode,
-      child: AiScope(
-        registry: _ai,
-        child: DownloadScope(
-          manager: _downloads,
-          child: CompoundScope(
-            store: _store,
-            child: MaterialApp(
-              title: 'NEXUS',
-              debugShowCheckedModeBanner: false,
-              theme: buildNexusTheme(),
-              home: (_modeResolved && _mode == null)
-                  ? OnboardingScreen(onChoose: _chooseMode)
-                  : const RootShell(),
+      child: UpdateScope(
+        controller: _updates,
+        child: AiScope(
+          registry: _ai,
+          child: DownloadScope(
+            manager: _downloads,
+            child: CompoundScope(
+              store: _store,
+              child: MaterialApp(
+                title: 'NEXUS',
+                debugShowCheckedModeBanner: false,
+                theme: buildNexusTheme(),
+                home: (_modeResolved && _mode == null)
+                    ? OnboardingScreen(onChoose: _chooseMode)
+                    : const RootShell(),
+              ),
             ),
           ),
         ),
