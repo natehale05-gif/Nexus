@@ -268,6 +268,32 @@ iteration - at `.../cesium/` (see the GitHub Pages section below).
 
 ## Running the server
 
+### From inside the app (desktop)
+
+Every desktop release bundles a native `nexus_server` next to the app
+executable. **Settings → Run a server here → Start server and pair this
+device** compiles down to: launch it, wait for `/health`, read the pairing
+token it generated, and connect this device to it automatically. Point it at
+your media folder in the same panel, and the token is shown so your phone and
+other machines can pair to the same server over the LAN or Tailscale.
+
+Notes on how it behaves, since they're deliberate:
+
+- The server binds `0.0.0.0`, not localhost - the point of hosting it here is
+  that your other devices reach it. The pairing token is the auth boundary,
+  not the bind address.
+- Its data lives beside the app's own (`applicationSupport/server`), not in
+  the install directory, so updating or uninstalling doesn't take your
+  compound and pairing token with it.
+- The process is a child of the app, not detached. If the app quits the
+  server goes with it - a stale one would hold port 8765/8766 and make the
+  next start fail for no visible reason.
+- A `flutter run` checkout has no bundled binary, so that panel says so
+  instead of offering a button that can only fail. Use the manual route below.
+
+### Manually
+
+
 ```bash
 cd server
 dart pub get

@@ -8,6 +8,7 @@ import '../../state/app_mode.dart';
 import '../../state/compound_scope.dart';
 import '../../state/connection_scope.dart';
 import '../../state/connection_settings.dart';
+import '../../state/local_server_scope.dart';
 import '../../state/map_settings.dart';
 import '../../state/nexus_data_source.dart';
 import '../../state/update_scope.dart';
@@ -39,6 +40,8 @@ class _SettingsTabState extends State<SettingsTab> {
   final _aiModelController = TextEditingController();
   final _aiKeyController = TextEditingController();
   final _aiUrlController = TextEditingController();
+  final _mediaRootController = TextEditingController();
+  final _mediaRootFocus = FocusNode();
   final _ionTokenController = TextEditingController();
   final _ionTokenFocus = FocusNode();
   bool _ionSaved = true;
@@ -98,6 +101,8 @@ class _SettingsTabState extends State<SettingsTab> {
     _aiModelFocus.dispose();
     _aiKeyFocus.dispose();
     _aiUrlFocus.dispose();
+    _mediaRootController.dispose();
+    _mediaRootFocus.dispose();
     _ionTokenController.dispose();
     _ionTokenFocus.dispose();
     super.dispose();
@@ -173,9 +178,10 @@ class _SettingsTabState extends State<SettingsTab> {
     final store = CompoundScope.of(context);
     final registry = AiScope.of(context);
     final updates = UpdateScope.of(context);
+    final local = LocalServerScope.of(context);
 
     return AnimatedBuilder(
-      animation: Listenable.merge([store, registry, updates]),
+      animation: Listenable.merge([store, registry, updates, local]),
       builder: (context, _) {
         final (statusLabel, statusColor) = switch (store.connectionStatus) {
           ConnectionStatus.demo => ('Local Demo Mode', NexusColors.textMuted),
@@ -328,6 +334,7 @@ class _SettingsTabState extends State<SettingsTab> {
                       ),
                     ],
                     const SizedBox(height: 20),
+                    ..._localServerSection(LocalServerScope.of(context), connectionScope),
                     ..._updateSection(UpdateScope.of(context)),
                     ..._modeSection(connectionScope),
                     ..._mapSection(),
@@ -351,6 +358,129 @@ class _SettingsTabState extends State<SettingsTab> {
   /// Version + update state. Desktop can install the update itself; web
   /// updates by reloading, and mobile goes through the app stores, so the
   /// button only appears where it does something.
+  /// Run the bundled nexus_server on this machine and pair to it in one
+  /// step, so "set up a server" doesn't mean opening a terminal.
+  List<Widget> _localServerSection(LocalServerController local, ConnectionScope scope) {
+    if (!local.supported) return const [];
+    return [
+      Text('Run a server here', style: NexusText.footnote),
+      const SizedBox(height: 10),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Make this computer the compound server. Your phone and other '
+                    'devices then pair to it over the LAN or Tailscale.',
+                    style: NexusText.subhead,
+                  ),
+                ),
+                if (local.running) ...[
+                  const SizedBox(width: 10),
+                  StatusPill(label: 'Running', color: NexusColors.green),
+                ],
+              ],
+            ),
+            if (!local.available) ...[
+              const SizedBox(height: 12),
+              Text(
+                'No server binary is bundled with this build. Release downloads '
+                'include one; a local `flutter run` does not.',
+                style: NexusText.footnote,
+              ),
+            ] else ...[
+              const SizedBox(height: 14),
+              Text('Media folder (optional)', style: NexusText.footnote),
+              const SizedBox(height: 6),
+              _SettingsField(
+                controller: _mediaRootController,
+                focusNode: _mediaRootFocus,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Where your movies, shows, photos and music live. Leave blank to '
+                'use the default folder inside the server data directory.',
+                style: NexusText.footnote,
+              ),
+              if (local.error != null) ...[
+                const SizedBox(height: 10),
+                Text(local.error!, style: NexusText.footnote.copyWith(color: NexusColors.red)),
+              ],
+              const SizedBox(height: 16),
+              PressScale(
+                onTap: local.busy
+                    ? () {}
+                    : (local.running
+                        ? local.stop
+                        : () => _startLocalServer(local, scope)),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    color: local.running ? NexusColors.secondarySurface : NexusColors.blue,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      local.busy
+                          ? 'Working…'
+                          : local.running
+                              ? 'Stop server'
+                              : 'Start server and pair this device',
+                      style: NexusText.headline.copyWith(
+                        color: local.running ? NexusColors.textPrimary : const Color(0xFFFFFFFF),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (local.running && local.handle != null) ...[
+                const SizedBox(height: 12),
+                Text('Pairing token for your other devices', style: NexusText.footnote),
+                const SizedBox(height: 4),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: NexusColors.secondarySurface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(local.handle!.token, style: NexusText.body),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'On another device, enter this computer\'s address and that token '
+                  'in Settings -> Server.',
+                  style: NexusText.footnote,
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
+  /// Starts the server, then immediately pairs this device to it - starting a
+  /// server you then have to hand-connect to would be a pointless extra step.
+  Future<void> _startLocalServer(LocalServerController local, ConnectionScope scope) async {
+    final handle = await local.start(mediaRoot: _mediaRootController.text);
+    if (handle == null || !mounted) return;
+    _addressController.text = handle.address;
+    _tokenController.text = handle.token;
+    await scope.onConnect(StoredConnection(
+      serverAddress: handle.address,
+      token: handle.token,
+    ));
+  }
+
   List<Widget> _updateSection(UpdateController updates) {
     final update = updates.available;
     return [

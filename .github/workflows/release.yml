@@ -105,6 +105,17 @@ jobs:
         run: flutter pub get
         working-directory: app
 
+      # The desktop app can run the compound server itself (Settings -> Run a
+      # server here), so ship a native nexus_server inside the bundle. It goes
+      # next to the app executable, which is where local_server_io.dart looks.
+      - name: Compile nexus_server
+        shell: bash
+        run: |
+          dart pub get
+          mkdir -p ../build-server
+          dart compile exe bin/server.dart -o "../build-server/nexus_server${{ matrix.platform == 'windows' && '.exe' || '' }}"
+        working-directory: server
+
       # NEXUS_VERSION is what the in-app update check compares against the
       # newest GitHub release; a build without it stays on the dev sentinel
       # and never offers updates.
@@ -127,6 +138,7 @@ jobs:
             choco install innosetup -y --no-progress
           }
           if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+          Copy-Item build-server/nexus_server.exe app/build/windows/x64/runner/Release/ -Force
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           & $iscc /DAppVersion=${{ steps.ver.outputs.version }} `
                   app\windows\installer\nexus.iss
@@ -141,6 +153,9 @@ jobs:
           app_path="$(find app/build/macos/Build/Products/Release -maxdepth 1 -name '*.app' | head -n 1)"
           if [ -z "$app_path" ]; then echo "No .app bundle was produced"; exit 1; fi
           echo "Packaging $app_path"
+          # Inside Contents/MacOS, beside the app binary itself.
+          cp build-server/nexus_server "$app_path/Contents/MacOS/nexus_server"
+          chmod +x "$app_path/Contents/MacOS/nexus_server"
           cp -R "$app_path" staging/
           ln -s /Applications staging/Applications
           hdiutil create -volname NEXUS -srcfolder staging \
@@ -152,6 +167,8 @@ jobs:
           mkdir -p dist
           # Ship the tarball as a NEXUS/ directory rather than loose files, so
           # extracting doesn't scatter a bundle across the user's cwd.
+          cp build-server/nexus_server app/build/linux/x64/release/bundle/nexus_server
+          chmod +x app/build/linux/x64/release/bundle/nexus_server
           mv app/build/linux/x64/release/bundle app/build/linux/x64/release/NEXUS
           tar -czf dist/NEXUS-linux-x64.tar.gz -C app/build/linux/x64/release NEXUS
           packaging/linux/build-deb.sh \

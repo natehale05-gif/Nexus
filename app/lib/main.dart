@@ -12,6 +12,7 @@ import 'state/connection_scope.dart';
 import 'state/connection_settings.dart';
 import 'state/download_manager.dart';
 import 'state/download_scope.dart';
+import 'state/local_server_scope.dart';
 import 'state/nexus_data_source.dart';
 import 'state/update_scope.dart';
 import 'state/server_client.dart';
@@ -39,6 +40,7 @@ class _NexusAppState extends State<NexusApp> {
   final _modeSettings = AppModeSettings();
   final _downloads = DownloadManager();
   final _updates = UpdateController();
+  final _localServer = LocalServerController();
   late NexusDataSource _store = _createInitialDataSource();
   StoredConnection? _current;
 
@@ -190,6 +192,7 @@ class _NexusAppState extends State<NexusApp> {
     _store.dispose();
     _downloads.dispose();
     _updates.dispose();
+    _localServer.dispose();
     _ai.dispose();
     super.dispose();
   }
@@ -202,21 +205,24 @@ class _NexusAppState extends State<NexusApp> {
       onForget: _forget,
       mode: _mode,
       onChooseMode: _chooseMode,
-      child: UpdateScope(
-        controller: _updates,
-        child: AiScope(
-          registry: _ai,
-          child: DownloadScope(
-            manager: _downloads,
-            child: CompoundScope(
-              store: _store,
-              child: MaterialApp(
-                title: 'NEXUS',
-                debugShowCheckedModeBanner: false,
-                theme: buildNexusTheme(),
-                home: (_modeResolved && _mode == null)
-                    ? OnboardingScreen(onChoose: _chooseMode)
-                    : const RootShell(),
+      child: LocalServerScope(
+        controller: _localServer,
+        child: UpdateScope(
+          controller: _updates,
+          child: AiScope(
+            registry: _ai,
+            child: DownloadScope(
+              manager: _downloads,
+              child: CompoundScope(
+                store: _store,
+                child: MaterialApp(
+                  title: 'NEXUS',
+                  debugShowCheckedModeBanner: false,
+                  theme: buildNexusTheme(),
+                  home: (_modeResolved && _mode == null)
+                      ? OnboardingScreen(onChoose: _chooseMode)
+                      : const RootShell(),
+                ),
               ),
             ),
           ),
