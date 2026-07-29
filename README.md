@@ -444,3 +444,26 @@ cd server && dart test    # server-side state, command dispatch, Ollama action p
 cd app && flutter test    # widget smoke test
 cd app && flutter analyze # 0 issues
 ```
+
+CI pins **Flutter 3.44.8** ([`deploy-web.yml`](.github/workflows/deploy-web.yml),
+[`release.yml`](.github/workflows/release.yml)). That floor is not arbitrary:
+GitHub's `windows-latest` is now the `windows-2025-vs2026` image, and only
+Flutter 3.44+ knows to ask CMake for the *Visual Studio 18 2026* generator -
+older versions fall back to *Visual Studio 16 2019* and fail to configure.
+
+## Cutting a release
+
+`release.yml` builds all three desktop targets on every push, but it only
+publishes a GitHub Release for a version tag:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+That builds Windows/macOS/Linux, attaches
+`NEXUS-windows-x64.zip`, `NEXUS-macos.zip` and `NEXUS-linux-x64.tar.gz` to a
+Release named after the tag, and - because the README's buttons point at
+`releases/latest/download/` - repoints all three download buttons at the new
+build with no README edit. You can also run the workflow by hand from the
+Actions tab and pass the tag as an input.
