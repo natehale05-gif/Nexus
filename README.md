@@ -49,7 +49,8 @@ shared/   Pure-Dart models, enums, the insights engine, the demo/simulation
 app/      The Flutter app (iOS/Android/macOS/web). Mobile-first, map-first
           Home tab, bottom-sheet + full-screen building views, bespoke
           stroke-icon set, no third-party UI/state-management packages. On the
-          web build the Home map is a live CesiumJS 3D scene (web/cesium/),
+          web build the Home map is 2D satellite imagery by default, upgrading
+          to a CesiumJS 3D scene when an ion token is set (web/cesium/),
           embedded as a platform view.
 server/   The Dart server: WebSocket state sync (8765) + REST (8766),
           protocol bridge interfaces, and the proactive insights engine
@@ -213,58 +214,48 @@ ghost entries elsewhere. These controls are hidden when paired with a server:
 the server owns that state, so a local structural edit would be overwritten by
 its next push.
 
-## The 3D compound map (CesiumJS)
+## The compound map
 
-On the **web** build, the Home tab's map is a real 3D scene rendered with
-[CesiumJS](https://cesium.com/platform/cesiumjs/), living in
-[`app/web/cesium/`](app/web/cesium/):
+The Home tab's map has two modes, and the default needs nothing from you.
 
-- **Google Photorealistic 3D Tiles** (real-world buildings + terrain) as the
-  only base layer - there's no alternate terrain/imagery mode to switch to.
+### 2D satellite (default)
 
-> **The globe needs your own Cesium ion token.** ion authorizes tile requests
-> per account, so no token can be committed here that works for everyone.
-> Create one at [ion.cesium.com/tokens](https://ion.cesium.com/tokens) with
-> the default scopes (it must include `assets:read`), confirm *Google
-> Photorealistic 3D Tiles* is in that account's assets, then paste it into
-> **Settings → 3D map** and reload. Without it the map shows the offline
-> schematic and says exactly which of those steps is missing - it no longer
-> fails silently. `?ionToken=...` on the map URL also works for a quick test.
-- **Colored 3D compound buildings** - the Main House, Barn, Shop, Cabin, and
-  Gates are extruded footprints colored by status (green = nominal, amber =
-  attention, red = critical), with floating labels.
-- **3D vehicles** - the F-250 is a glTF model patrolling the perimeter road,
-  and the Model Y sits parked in the driveway. Tap any building or vehicle for
-  a themed status panel.
+Real aerial imagery with pan and zoom, compound buildings drawn on top as
+status-coloured markers you can tap for the same info panel the 3D map uses.
+Tiles come from Esri's World Imagery service, which needs no account and no
+API key - so a fresh install shows your actual property immediately.
+Attribution is drawn on the canvas, which is the condition of using it.
 
-The buildings/vehicles are laid out from the same normalized map coordinates
-the Flutter app uses, projected onto real ground at a configurable anchor.
+It's implemented directly on Canvas2D
+([`app/web/cesium/satellite_map.js`](app/web/cesium/satellite_map.js)) rather
+than pulling in Leaflet or MapLibre: the job is a tile grid plus markers, the
+Web Mercator math is about twenty lines, and it keeps the page
+dependency-free.
 
-**Offline fallback.** Photorealistic 3D Tiles need a live connection to
-Cesium ion/Google - if it can't load (no internet, or the tileset is
-otherwise unreachable) or the browser goes offline mid-session, the page
-automatically switches to a self-contained, dependency-free 2D schematic of
-the compound (`app/web/cesium/offline_map.js`, drawn straight from the same
-building/vehicle data with no network calls of its own), with an "OFFLINE"
-badge shown next to the brand chip. Building/vehicle taps still open the same
-info panel. When connectivity returns, the page reloads back into the normal
-3D view.
+### Photoreal 3D (optional, needs a Cesium ion token)
 
-**Configuring the location.** Edit `center` (and optionally `spanMeters` /
-`heading`) at the top of [`app/web/cesium/data.js`](app/web/cesium/data.js),
-or override per-visit with URL query params, e.g.
-`.../cesium/?lat=44.59&lon=-123.24&span=380`. The default anchor is flat
-Willamette Valley farmland just east of Corvallis, OR.
+Add a token in **Settings → Map** and the map upgrades to
+[CesiumJS](https://cesium.com/platform/cesiumjs/) with **Google Photorealistic
+3D Tiles** - real-world buildings and terrain, extruded compound footprints
+coloured by status, 3D vehicles including one patrolling the perimeter road.
 
-**Cesium ion token.** The map authenticates to Cesium ion (for the
-Photorealistic 3D Tiles + terrain) with the public client token in
-`data.js` (`NEXUS_CONFIG.ionToken`). It's a browser-side access token, so
-it's fine to commit; swap in your own from
-[cesium.com/ion/tokens](https://cesium.com/ion/tokens) if you prefer.
+Create a free token at [ion.cesium.com/tokens](https://ion.cesium.com/tokens)
+with the default scopes (it must include `assets:read`), and confirm *Google
+Photorealistic 3D Tiles* is in that account's assets. Tokens are per-account,
+so none can be committed here that works for everyone.
 
-The map is a self-contained static bundle (Cesium loads from a CDN), so you
-can also open it **standalone** without the Flutter shell - handy for quick
-iteration - at `.../cesium/` (see the GitHub Pages section below).
+### What you get when
+
+| State | Map |
+|---|---|
+| No token (default) | 2D satellite |
+| Token missing `assets:read`, or tileset unavailable | 2D satellite, with a message saying which |
+| Valid token | Photoreal 3D |
+| No internet at all | Self-contained Canvas2D schematic |
+
+Falling back to the schematic only happens when imagery genuinely can't load -
+real satellite tiles beat a diagram, so a missing token no longer drops you to
+one.
 
 ## Running the server
 

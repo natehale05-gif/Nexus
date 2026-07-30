@@ -24,6 +24,9 @@
   </head>
   <body>
     <div id="cesiumContainer"></div>
+    <div id="satelliteMap" class="nx-offline-map" hidden>
+      <canvas id="satelliteCanvas"></canvas>
+    </div>
     <div id="offlineMap" class="nx-offline-map" hidden>
       <canvas id="offlineCanvas"></canvas>
     </div>
@@ -36,6 +39,9 @@
           <div class="nx-sub">Compound · 3D map</div>
         </div>
         <span class="nx-badge"><span class="nx-dot"></span>DEMO</span>
+        <span id="satelliteBadge" class="nx-badge" hidden>
+          <span class="nx-dot"></span>2D SATELLITE
+        </span>
         <span id="offlineBadge" class="nx-badge nx-badge-offline" hidden>
           <span class="nx-dot"></span>OFFLINE
         </span>
@@ -79,6 +85,7 @@
     <div id="toast" class="nx-toast"></div>
 
     <script src="data.js"></script>
+    <script src="satellite_map.js"></script>
     <script src="offline_map.js"></script>
     <script src="app.js"></script>
   </body>

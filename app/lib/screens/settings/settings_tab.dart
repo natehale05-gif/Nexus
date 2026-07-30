@@ -633,7 +633,7 @@ class _SettingsTabState extends State<SettingsTab> {
   List<Widget> _mapSection() {
     if (!mapTokenConfigurable) return const [];
     return [
-      Text('3D map', style: NexusText.footnote),
+      Text('Map', style: NexusText.footnote),
       const SizedBox(height: 10),
       Container(
         padding: const EdgeInsets.all(16),
@@ -642,8 +642,9 @@ class _SettingsTabState extends State<SettingsTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'The Home map renders Google Photorealistic 3D Tiles through Cesium ion. '
-              'Tokens are tied to an ion account, so this one is yours to set.',
+              'The Home map shows 2D satellite imagery by default - no setup, no '
+              'account. Adding a Cesium ion token upgrades it to a photoreal 3D '
+              'globe; tokens are tied to an ion account, so this one is yours.',
               style: NexusText.subhead,
             ),
             const SizedBox(height: 14),
@@ -657,10 +658,10 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Create one at ion.cesium.com/tokens with the default scopes (it must include '
-              'assets:read), and make sure Google Photorealistic 3D Tiles is added to that '
-              'account’s assets. Without a valid token the map falls back to the offline '
-              'schematic and tells you why.',
+              'Optional. Create one at ion.cesium.com/tokens with the default scopes (it must '
+              'include assets:read), and make sure Google Photorealistic 3D Tiles is added to '
+              'that account’s assets. Leave this blank and the map stays 2D satellite, which '
+              'works fine.',
               style: NexusText.footnote,
             ),
             const SizedBox(height: 20),

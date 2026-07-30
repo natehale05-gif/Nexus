@@ -196,6 +196,9 @@
   });
 
   window.NexusOfflineMap = {
+    get active() {
+      return active;
+    },
     activate() {
       if (active || !canvas) return;
       active = true;

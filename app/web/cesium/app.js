@@ -60,29 +60,47 @@
     offlineActive = true;
     const cesiumContainer = document.getElementById('cesiumContainer');
     if (cesiumContainer) cesiumContainer.style.display = 'none';
-    if (window.NexusOfflineMap) window.NexusOfflineMap.activate();
+
+    // Order of preference: 2D satellite imagery (needs nothing), then the
+    // self-contained schematic. Only a genuine network failure - or the
+    // satellite tiles themselves failing - should reach the schematic, since
+    // real imagery is far more useful than a diagram.
+    const wantsSchematic = reason === 'offline' || reason === 'schematic';
+    if (!wantsSchematic && window.NexusSatelliteMap) {
+      window.NexusSatelliteMap.activate();
+      const badge = document.getElementById('satelliteBadge');
+      if (badge) badge.hidden = false;
+    } else {
+      if (window.NexusSatelliteMap) window.NexusSatelliteMap.deactivate();
+      const satBadge = document.getElementById('satelliteBadge');
+      if (satBadge) satBadge.hidden = true;
+      if (window.NexusOfflineMap) window.NexusOfflineMap.activate();
+    }
     hideLoading();
 
     const messages = {
       noToken:
-        '<b>No Cesium ion token set.</b><br/>The 3D globe needs one. Create a free token at ' +
-        '<a href="https://ion.cesium.com/tokens" target="_blank" rel="noopener">ion.cesium.com/tokens</a>, ' +
-        'then add it in Settings → 3D map. Showing the offline schematic meanwhile.',
+        '<b>2D satellite view.</b><br/>Want the photoreal 3D globe? Add a free Cesium ion ' +
+        'token in Settings → 3D map (' +
+        '<a href="https://ion.cesium.com/tokens" target="_blank" rel="noopener">ion.cesium.com/tokens</a>' +
+        ').',
       badToken:
-        '<b>Cesium ion token rejected.</b><br/>It’s missing the <code>assets:read</code> scope, so tile ' +
-        'requests can’t be authorized. Create a new token at ' +
-        '<a href="https://ion.cesium.com/tokens" target="_blank" rel="noopener">ion.cesium.com/tokens</a> ' +
-        'with the default scopes and re-enter it in Settings → 3D map.',
+        '<b>Cesium ion token rejected - showing 2D satellite.</b><br/>It’s missing the ' +
+        '<code>assets:read</code> scope, so tile requests can’t be authorized. Create a new ' +
+        'token at <a href="https://ion.cesium.com/tokens" target="_blank" rel="noopener">' +
+        'ion.cesium.com/tokens</a> with the default scopes and re-enter it in Settings → 3D map.',
       tilesUnavailable:
-        '<b>Photorealistic 3D Tiles unavailable.</b><br/>The token works, but the tileset wouldn’t load. ' +
-        'Check that <i>Google Photorealistic 3D Tiles</i> is added to your ion account’s assets.',
+        '<b>Photorealistic 3D Tiles unavailable - showing 2D satellite.</b><br/>The token works, ' +
+        'but the tileset wouldn’t load. Check that <i>Google Photorealistic 3D Tiles</i> is added ' +
+        'to your ion account’s assets.',
       offline:
-        '<b>Running in offline mode.</b><br/>Photorealistic 3D Tiles aren’t reachable, so a simplified ' +
-        'compound map is shown instead.',
+        '<b>Running offline.</b><br/>No map imagery is reachable, so a simplified compound ' +
+        'schematic is shown instead.',
     };
-    // Token problems don't fix themselves, so leave those on screen.
-    const sticky = reason === 'noToken' || reason === 'badToken' || reason === 'tilesUnavailable';
-    showToast(messages[reason] || messages.offline, sticky ? 0 : 6000);
+    // A bad token won't fix itself, so keep that one up. "No token" is now
+    // just an upsell to 3D over a working map, so let it auto-hide.
+    const sticky = reason === 'badToken' || reason === 'tilesUnavailable';
+    showToast(messages[reason] || messages.offline, sticky ? 0 : 7000);
   }
 
   /// Reads the `scopes` claim out of an ion token without verifying its
@@ -107,6 +125,12 @@
     }
     return null;
   }
+
+  // satellite_map.js calls this when its tiles won't load at all.
+  window.NexusMapFallback = function (reason) {
+    if (window.NexusOfflineMap && window.NexusOfflineMap.active) return;
+    activateOfflineFallback(reason === 'offline' ? 'schematic' : reason);
+  };
 
   window.addEventListener('offline', () => {
     if (!offlineActive) activateOfflineFallback('offline');
