@@ -19,15 +19,19 @@
   box-sizing: border-box;
 }
 
-html,
 /* An explicit `display` on an element defeats the browser's built-in
    [hidden] { display: none } - which is exactly what .nx-badge's
    `display: inline-flex` was doing, leaving the OFFLINE badge on screen while
-   its hidden attribute was set. Make the attribute win everywhere. */
+   its hidden attribute was set. Make the attribute win everywhere.
+
+   Kept clear of the `html, body` rule below: inserting into the middle of that
+   comma-separated selector turned it into `html, [hidden]` and hid the whole
+   page. */
 [hidden] {
   display: none !important;
 }
 
+html,
 body {
   margin: 0;
   padding: 0;
