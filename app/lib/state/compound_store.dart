@@ -159,6 +159,12 @@ class CompoundStore extends NexusDataSource {
   void renameDevice(String id, String name) =>
       _mutate(() => compound.devices.firstWhere((d) => d.id == id).name = name);
 
+  /// Re-points a device at different hardware, or unwires it entirely.
+  /// Without this, a typo'd IP meant deleting the device and starting over.
+  void setDeviceEndpoint(String id, DeviceEndpoint? endpoint) => _mutate(() {
+        compound.devices.firstWhere((d) => d.id == id).endpoint = endpoint;
+      });
+
   void removeDevice(String id) =>
       _mutate(() => compound.devices.removeWhere((d) => d.id == id));
 

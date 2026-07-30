@@ -8,6 +8,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:nexus_server/auth/auth_middleware.dart';
 import 'package:nexus_server/auth/pairing_token.dart';
 import 'package:nexus_server/config.dart';
+import 'package:nexus_server/devices/device_poller.dart';
 import 'package:nexus_server/integrations/integrations_manager.dart';
 import 'package:nexus_server/media/library_index.dart';
 import 'package:nexus_server/media/library_scanner.dart';
@@ -65,6 +66,15 @@ Future<void> main(List<String> args) async {
   });
 
   await integrations.startAll();
+
+  // Re-read wired devices so state changed outside NEXUS (a wall switch, the
+  // vendor's own app, a schedule) doesn't leave the UI showing stale values.
+  final poller = DevicePoller(server)..start();
+  ProcessSignal.sigint.watch().listen((_) async {
+    poller.dispose();
+    await integrations.stopAll();
+    exit(0);
+  });
   wsHub.startBroadcasting();
   ticker.start();
 

@@ -214,6 +214,58 @@ Future<DeviceEndpoint?> promptForEndpoint(BuildContext context, {String? initial
   return DeviceEndpoint(protocol: protocol, host: host);
 }
 
+/// What to do with an existing device.
+enum DeviceAction { wiring, unwire, rename, remove }
+
+Future<DeviceAction?> promptForDeviceAction(
+  BuildContext context, {
+  required String deviceName,
+  String? wiredTo,
+}) {
+  return showDialog<DeviceAction>(
+    context: context,
+    builder: (context) => _Sheet(
+      title: deviceName,
+      subtitle: wiredTo == null
+          ? 'Tracked in NEXUS but not wired to any hardware.'
+          : 'Controlling $wiredTo',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final entry in [
+            (DeviceAction.wiring, wiredTo == null ? 'Connect to hardware' : 'Change address'),
+            if (wiredTo != null) (DeviceAction.unwire, 'Disconnect from hardware'),
+            (DeviceAction.rename, 'Rename'),
+            (DeviceAction.remove, 'Delete device'),
+          ])
+            PressScale(
+              onTap: () => Navigator.of(context).pop(entry.$1),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                decoration: BoxDecoration(
+                  color: NexusColors.secondarySurface,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  entry.$2,
+                  style: NexusText.bodyMedium.copyWith(
+                    color: entry.$1 == DeviceAction.remove
+                        ? NexusColors.red
+                        : NexusColors.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 4),
+          _Actions(onConfirm: null, onCancelOnly: true),
+        ],
+      ),
+    ),
+  );
+}
+
 class _Sheet extends StatelessWidget {
   const _Sheet({required this.title, this.subtitle, required this.child});
 

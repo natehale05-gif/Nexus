@@ -442,6 +442,28 @@ first, so the UI never blocks on hardware, and a device being unplugged is an
 ordinary condition rather than a failed command. Zigbee and Z-Wave devices
 reach NEXUS through a hub that itself speaks one of the protocols above.
 
+### Keeping up with hardware you don't control exclusively
+
+Control is two-way. The server re-reads every wired device every 15 seconds
+and reconciles the model, so flipping a Shelly at the wall switch, from its
+own app, or on a schedule shows up in NEXUS instead of leaving the UI
+asserting whatever it last commanded.
+
+- **Unreachable is not "off".** A device that stops answering keeps its last
+  known state rather than being reported as off, which would silently
+  misrepresent a light that's actually on.
+- **Broadcasts only on a real difference**, so an idle compound doesn't push
+  the full state tree to every client four times a minute.
+- **Overlapping rounds collapse.** On a compound with slow or unplugged
+  devices a round can outlast the interval; stacking rounds would multiply
+  traffic against exactly the devices already struggling to answer.
+- A relay driving a gate reads energized-as-open, so `locked` is its inverse.
+
+Each device's wiring is editable after the fact - tap it under its room in
+**Buildings** to change the address, disconnect it, rename it or remove it. A
+filled dot means it drives real hardware, a hollow one means NEXUS is only
+tracking it.
+
 ### Finding devices on your network
 
 **Buildings → Find devices on my network** asks the server to scan and lists

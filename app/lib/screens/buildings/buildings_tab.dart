@@ -193,6 +193,84 @@ class _BuildingsTabState extends State<BuildingsTab> {
     );
   }
 
+  /// Re-point, rename or remove a device after it's been added. Previously
+  /// the endpoint could only be set at creation, so a mistyped IP meant
+  /// deleting the device and starting over.
+  Future<void> _editDevice(CompoundStore store, Device device) async {
+    final action = await promptForDeviceAction(
+      context,
+      deviceName: device.name,
+      wiredTo: device.endpoint == null
+          ? null
+          : '${device.endpoint!.protocol.name} @ ${device.endpoint!.host}',
+    );
+    if (action == null || !mounted) return;
+    switch (action) {
+      case DeviceAction.wiring:
+        final endpoint = await promptForEndpoint(context, initialHost: device.endpoint?.host);
+        store.setDeviceEndpoint(device.id, endpoint);
+      case DeviceAction.unwire:
+        store.setDeviceEndpoint(device.id, null);
+      case DeviceAction.rename:
+        final name = await promptForName(
+          context,
+          title: 'Rename device',
+          initialValue: device.name,
+          confirmLabel: 'Rename',
+        );
+        if (name != null) store.renameDevice(device.id, name);
+      case DeviceAction.remove:
+        final ok = await confirmDelete(
+          context,
+          title: 'Delete ${device.name}?',
+          detail: 'It is removed from the compound. The hardware itself is untouched.',
+        );
+        if (ok) store.removeDevice(device.id);
+    }
+  }
+
+  /// Compact list of a room's devices with their wiring state, so it's visible
+  /// at a glance which ones actually control hardware.
+  Widget _wiringList(CompoundStore store, List<Device> devices) {
+    if (devices.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final device in devices)
+            PressScale(
+              onTap: () => _editDevice(store, device),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: NexusColors.secondarySurface,
+                  borderRadius: BorderRadius.circular(NexusRadii.pill),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        // Filled = wired to hardware, hollow = tracked only.
+                        color: device.endpoint == null ? NexusColors.textFaint : NexusColors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Text(device.name, style: NexusText.footnote),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _renameBuilding(CompoundStore store, Building building) async {
     final name = await promptForName(
       context,
@@ -275,6 +353,7 @@ class _BuildingsTabState extends State<BuildingsTab> {
             devices: compound.devicesOfRoom(room.id),
             showEmpty: true,
           ),
+          if (editor != null) _wiringList(editor, compound.devicesOfRoom(room.id)),
           if (editor != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 14),

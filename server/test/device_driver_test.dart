@@ -113,6 +113,8 @@ void main() {
     }
   });
 
+  _statusTests();
+
   group('end to end against a stub device', () {
     late HttpServer stub;
     final hits = <String>[];
@@ -177,6 +179,68 @@ void main() {
       server.toggleLight('gone');
       expect(light.on, isTrue, reason: 'an unplugged device must not block the UI');
       server.dispose();
+    });
+  });
+}
+
+// --- Status reads -----------------------------------------------------------
+// Captured payload shapes, because every vendor reports differently and a
+// wrong reading makes the UI state the opposite of reality.
+
+void _statusTests() {
+  group('status parsing', () {
+    test('Shelly gen1 relay', () {
+      const body = '{"relays":[{"ison":true},{"ison":false}]}';
+      expect(parseStatusResponse(endpoint(DeviceProtocol.shellyGen1), body)!.on, isTrue);
+      expect(
+        parseStatusResponse(endpoint(DeviceProtocol.shellyGen1, channel: 1), body)!.on,
+        isFalse,
+      );
+    });
+
+    test('Shelly gen1 dimmer reports brightness and takes priority over relays', () {
+      const body = '{"lights":[{"ison":true,"brightness":42}],"relays":[{"ison":false}]}';
+      final state = parseStatusResponse(endpoint(DeviceProtocol.shellyGen1), body)!;
+      expect(state.on, isTrue);
+      expect(state.brightness, 42);
+    });
+
+    test('Shelly gen2 keys components by type and index', () {
+      const body = '{"switch:0":{"output":true},"light:1":{"output":true,"brightness":70}}';
+      expect(parseStatusResponse(endpoint(DeviceProtocol.shellyGen2), body)!.on, isTrue);
+      final light = parseStatusResponse(endpoint(DeviceProtocol.shellyGen2, channel: 1), body)!;
+      expect(light.brightness, 70);
+    });
+
+    test('Tasmota maps ON/OFF strings and reads Dimmer', () {
+      const body = '{"POWER":"ON","Dimmer":25}';
+      final state = parseStatusResponse(endpoint(DeviceProtocol.tasmota), body)!;
+      expect(state.on, isTrue);
+      expect(state.brightness, 25);
+      expect(
+        parseStatusResponse(endpoint(DeviceProtocol.tasmota), '{"POWER":"OFF"}')!.on,
+        isFalse,
+      );
+    });
+
+    test('WLED brightness comes back as a 0-100 percentage', () {
+      expect(
+        parseStatusResponse(endpoint(DeviceProtocol.wled), '{"on":true,"bri":255}')!.brightness,
+        100,
+      );
+      expect(
+        parseStatusResponse(endpoint(DeviceProtocol.wled), '{"on":true,"bri":128}')!.brightness,
+        50,
+      );
+    });
+
+    test('garbage and missing channels read as no data, not as off', () {
+      expect(parseStatusResponse(endpoint(DeviceProtocol.wled), 'not json'), isNull);
+      expect(
+        parseStatusResponse(endpoint(DeviceProtocol.shellyGen1, channel: 5),
+            '{"relays":[{"ison":true}]}'),
+        isNull,
+      );
     });
   });
 }
