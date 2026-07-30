@@ -147,10 +147,15 @@
     if (!canvas) return;
     const ratio = dpr();
     const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = Math.max(1, Math.floor(rect.width * ratio));
-    canvas.height = Math.max(1, Math.floor(rect.height * ratio));
-    canvas.style.width = rect.width + 'px';
-    canvas.style.height = rect.height + 'px';
+    // Fall back to the viewport if the container hasn't been laid out yet, or
+    // if it collapsed. Trusting the parent alone is what produced a 150px-tall
+    // strip when its CSS didn't match.
+    const width = rect.width > 1 ? rect.width : window.innerWidth;
+    const height = rect.height > 1 ? rect.height : window.innerHeight;
+    canvas.width = Math.max(1, Math.floor(width * ratio));
+    canvas.height = Math.max(1, Math.floor(height * ratio));
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     render();
   }
@@ -328,6 +333,15 @@
       canvas.addEventListener('wheel', onWheel, { passive: false });
       window.addEventListener('resize', resize);
       resize();
+      // The container was hidden a moment ago, so its box may not be final on
+      // this frame. Re-measure once layout settles - cheap, and the difference
+      // between a correct map and a clipped one.
+      requestAnimationFrame(resize);
+      // Rotating a phone or an iframe being resized by the Flutter shell can
+      // land after that, so keep watching the element itself where supported.
+      if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(resize).observe(canvas.parentElement);
+      }
     },
 
     deactivate() {

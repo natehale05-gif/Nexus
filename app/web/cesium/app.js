@@ -93,6 +93,9 @@
         '<b>Photorealistic 3D Tiles unavailable - showing 2D satellite.</b><br/>The token works, ' +
         'but the tileset wouldn’t load. Check that <i>Google Photorealistic 3D Tiles</i> is added ' +
         'to your ion account’s assets.',
+      cesiumMissing:
+        '<b>2D satellite view.</b><br/>The 3D engine could not be downloaded, so the map is ' +
+        'running in 2D. It will try again next time you open it.',
       offline:
         '<b>Running offline.</b><br/>No map imagery is reachable, so a simplified compound ' +
         'schematic is shown instead.',
@@ -147,7 +150,11 @@
     const center = Cesium.Cartesian3.fromDegrees(cfg.center.lon, cfg.center.lat);
     enuFrame = Cesium.Transforms.eastNorthUpToFixedFrame(center);
   }
-  const headingRad = Cesium.Math.toRadians(cfg.heading);
+  // Deliberately not Cesium.Math.toRadians: this runs at script load, and if
+  // the Cesium CDN is slow or blocked, touching Cesium here throws before
+  // boot() gets a chance to fall back to the 2D map - a blank screen instead
+  // of a working one.
+  const headingRad = (cfg.heading * Math.PI) / 180;
 
   // Normalized map (x right, y down) -> east/north meters, then rotated.
   function normToLocal(x, y) {
@@ -233,6 +240,14 @@
     if (window.self !== window.top) {
       document.body.classList.add('embedded');
     }
+    // The CDN can be blocked by a network policy, an extension, or just be
+    // down. That's not a reason to show nothing.
+    if (typeof Cesium === 'undefined') {
+      console.warn('CesiumJS did not load - using the 2D satellite map.');
+      activateOfflineFallback('cesiumMissing');
+      return;
+    }
+
     const tokenProblem = ionTokenProblem(cfg.ionToken);
     if (tokenProblem) {
       console.warn(
@@ -261,8 +276,11 @@
         infoBox: false,
       });
     } catch (e) {
-      console.warn('Failed to start CesiumJS, falling back to the offline map.', e);
-      activateOfflineFallback('offline');
+      // Not 'offline': the network is fine, the 3D engine just wouldn't
+      // start. Dropping to the schematic here would throw away perfectly
+      // available satellite imagery.
+      console.warn('CesiumJS failed to start - using the 2D satellite map.', e);
+      activateOfflineFallback('cesiumMissing');
       return;
     }
 

@@ -20,6 +20,14 @@
 }
 
 html,
+/* An explicit `display` on an element defeats the browser's built-in
+   [hidden] { display: none } - which is exactly what .nx-badge's
+   `display: inline-flex` was doing, leaving the OFFLINE badge on screen while
+   its hidden attribute was set. Make the attribute win everywhere. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -37,14 +45,22 @@ body {
   inset: 0;
 }
 
-/* Offline fallback: a self-contained Canvas2D schematic shown instead of
-   Cesium when Photorealistic 3D Tiles can't load (see offline_map.js). */
-#offlineMap {
+/* Canvas map layers, both full-screen and stacked under the UI overlay:
+   the 2D satellite map (satellite_map.js, the default) and the offline
+   schematic (offline_map.js, used only when no imagery is reachable).
+
+   Shared rule rather than per-id: a satellite container that missed the
+   sizing rules collapsed the canvas to its intrinsic 300x150 and rendered a
+   thin strip at the top of the screen. One selector both layers match makes
+   that failure mode impossible to reintroduce. */
+#offlineMap,
+#satelliteMap {
   position: absolute;
   inset: 0;
   background: var(--nx-base);
 }
-#offlineMap canvas {
+#offlineMap canvas,
+#satelliteMap canvas {
   display: block;
   width: 100%;
   height: 100%;
