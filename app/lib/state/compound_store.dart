@@ -165,6 +165,42 @@ class CompoundStore extends NexusDataSource {
         compound.devices.firstWhere((d) => d.id == id).endpoint = endpoint;
       });
 
+  /// Vehicles are compound-level, not building-level - a truck isn't in a
+  /// room. They get their own map position so they show up on Home.
+  Vehicle addVehicle(String name, {double mapX = 0.5, double mapY = 0.5}) {
+    final vehicle = Vehicle(
+      id: _slug(name, compound.vehicles.map((v) => v.id)),
+      name: name,
+      status: VehicleStatus.parked,
+      locationDescription: 'On the compound',
+      batteryPercent: 100,
+      mapX: mapX.clamp(0.05, 0.95),
+      mapY: mapY.clamp(0.05, 0.95),
+    );
+    _mutate(() => compound.vehicles.add(vehicle));
+    return vehicle;
+  }
+
+  void renameVehicle(String id, String name) =>
+      _mutate(() => compound.vehicles.firstWhere((v) => v.id == id).name = name);
+
+  void removeVehicle(String id) =>
+      _mutate(() => compound.vehicles.removeWhere((v) => v.id == id));
+
+  /// A gate is a [LockDevice] with gate wording - same hardware path, but the
+  /// UI says Open/Closed rather than Locked/Unlocked.
+  LockDevice addGate(String name, String buildingId, {DeviceEndpoint? endpoint}) {
+    final gate = LockDevice(
+      id: _slug(name, compound.devices.map((d) => d.id)),
+      name: name,
+      buildingId: buildingId,
+      isGate: true,
+      endpoint: endpoint,
+    );
+    addDevice(gate);
+    return gate;
+  }
+
   void removeDevice(String id) =>
       _mutate(() => compound.devices.removeWhere((d) => d.id == id));
 

@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import 'package:nexus_shared/nexus_shared.dart';
+
 import '../../ai/ai_provider.dart';
 import '../../ai/ai_settings.dart';
 import '../../ai/hugging_face.dart';
@@ -32,7 +34,13 @@ class SettingsTab extends StatefulWidget {
   State<SettingsTab> createState() => _SettingsTabState();
 }
 
+/// Settings is a short index of pages rather than one long scroll. It had
+/// grown to six stacked sections - server, run-a-server, version, mode, map,
+/// AI - and finding anything meant scrolling past everything else.
+enum _SettingsPage { server, compound, media, ai, map, about }
+
 class _SettingsTabState extends State<SettingsTab> {
+  _SettingsPage? _page;
   final _addressController = TextEditingController();
   final _tokenController = TextEditingController();
   final _addressFocusNode = FocusNode();
@@ -406,151 +414,54 @@ class _SettingsTabState extends State<SettingsTab> {
           color: NexusColors.background,
           child: Column(
             children: [
-              const TabHeader(title: 'Settings'),
+              TabHeader(
+                title: switch (_page) {
+                  null => 'Settings',
+                  _SettingsPage.server => 'Server',
+                  _SettingsPage.compound => 'Compound',
+                  _SettingsPage.media => 'Media & files',
+                  _SettingsPage.ai => 'AI',
+                  _SettingsPage.map => 'Map',
+                  _SettingsPage.about => 'About',
+                },
+                pillLabel: _page == null ? statusLabel : null,
+                pillColor: _page == null ? statusColor : null,
+              ),
+              if (_page != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+                    child: PressScale(
+                      onTap: () => setState(() => _page = null),
+                      child: Text(
+                        '‹  All settings',
+                        style: NexusText.bodyMedium.copyWith(color: NexusColors.blue),
+                      ),
+                    ),
+                  ),
+                ),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
-                    Row(
-                      children: [
-                        Text('Server', style: NexusText.footnote),
-                        const Spacer(),
-                        StatusPill(label: statusLabel, color: statusColor),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: NexusColors.surface,
-                        borderRadius: BorderRadius.circular(NexusRadii.card),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Enter the address of a nexus_server instance - a Tailscale name '
-                            '(myhouse.tailnet-name.ts.net) for remote access, or a LAN address '
-                            '(192.168.1.50:8765) at home - and the pairing token shown in its '
-                            'startup log.',
-                            style: NexusText.subhead,
-                          ),
-                          const SizedBox(height: 16),
-                          Text('Server address', style: NexusText.footnote),
-                          const SizedBox(height: 6),
-                          _SettingsField(
-                            controller: _addressController,
-                            focusNode: _addressFocusNode,
-                            onChanged: (_) => setState(() {}),
-                          ),
-                          const SizedBox(height: 16),
-                          Text('Pairing token', style: NexusText.footnote),
-                          const SizedBox(height: 6),
-                          _SettingsField(
-                            controller: _tokenController,
-                            focusNode: _tokenFocusNode,
-                            obscureText: true,
-                            onChanged: (_) => setState(() {}),
-                          ),
-                          if (_error != null) ...[
-                            const SizedBox(height: 10),
-                            Text(_error!, style: NexusText.footnote.copyWith(color: NexusColors.red)),
+                    if (_page == null)
+                      ..._indexRows(connectionScope, store)
+                    else
+                      ...switch (_page!) {
+                        _SettingsPage.server => [
+                            ..._localServerSection(LocalServerScope.of(context), connectionScope),
+                            ..._serverSection(statusLabel, statusColor, connectionScope, store),
                           ],
-                          const SizedBox(height: 20),
-                          PressScale(
-                            onTap: _canConnect ? _connect : null,
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(vertical: 15),
-                              decoration: BoxDecoration(
-                                color: _canConnect ? NexusColors.blue : NexusColors.secondarySurface,
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  _busy ? 'Connecting…' : 'Connect',
-                                  style: NexusText.headline.copyWith(
-                                    color: _canConnect ? const Color(0xFFFFFFFF) : NexusColors.textFaint,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (connectionScope.current != null) ...[
-                            const SizedBox(height: 10),
-                            PressScale(
-                              onTap: _busy ? null : _forget,
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 15),
-                                decoration: BoxDecoration(
-                                  color: NexusColors.secondarySurface,
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'Forget This Server',
-                                    style: NexusText.headline.copyWith(color: NexusColors.red),
-                                  ),
-                                ),
-                              ),
-                            ),
+                        _SettingsPage.compound => _compoundSection(store),
+                        _SettingsPage.media => _mediaSection(store),
+                        _SettingsPage.ai => _aiSection(registry),
+                        _SettingsPage.map => _mapSection(),
+                        _SettingsPage.about => [
+                            ..._updateSection(UpdateScope.of(context)),
+                            ..._modeSection(connectionScope),
                           ],
-                        ],
-                      ),
-                    ),
-                    if (store.connectionStatus == ConnectionStatus.connected) ...[
-                      const SizedBox(height: 20),
-                      Text('Media Library', style: NexusText.footnote),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: NexusColors.surface,
-                          borderRadius: BorderRadius.circular(NexusRadii.card),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${store.compound.mediaStats.movieCount} movies · '
-                              '${store.compound.mediaStats.showCount} shows · '
-                              '${store.compound.mediaStats.episodeCount} episodes',
-                              style: NexusText.body,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Scanned from the folder set by NEXUS_MEDIA_ROOT on the server.',
-                              style: NexusText.footnote,
-                            ),
-                            const SizedBox(height: 16),
-                            PressScale(
-                              onTap: store.rescanLibrary,
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(vertical: 15),
-                                decoration: BoxDecoration(
-                                  color: NexusColors.secondarySurface,
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    'Rescan Library',
-                                    style: NexusText.headline.copyWith(color: NexusColors.blue),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    ..._localServerSection(LocalServerScope.of(context), connectionScope),
-                    ..._updateSection(UpdateScope.of(context)),
-                    ..._modeSection(connectionScope),
-                    ..._mapSection(),
-                    ..._aiSection(registry),
+                      },
                   ],
                 ),
               ),
@@ -570,6 +481,320 @@ class _SettingsTabState extends State<SettingsTab> {
   /// Version + update state. Desktop can install the update itself; web
   /// updates by reloading, and mobile goes through the app stores, so the
   /// button only appears where it does something.
+
+  /// The index: one row per area, each saying what it's currently set to so
+  /// the state of the system is readable without opening anything.
+  List<Widget> _indexRows(ConnectionScope scope, NexusDataSource store) {
+    final compound = store.compound;
+    final connected = store.connectionStatus == ConnectionStatus.connected;
+    final rows = <(_SettingsPage, String, String)>[
+      (
+        _SettingsPage.server,
+        'Server',
+        connected
+            ? 'Connected to ${scope.current?.serverAddress ?? 'a server'}'
+            : 'Not connected - run one here, or pair with one',
+      ),
+      (
+        _SettingsPage.compound,
+        'Compound',
+        '${compound.buildings.length} buildings · ${compound.rooms.length} rooms · '
+            '${compound.devices.length} devices · ${compound.vehicles.length} vehicles',
+      ),
+      (
+        _SettingsPage.media,
+        'Media & files',
+        '${compound.mediaStats.movieCount} movies · ${compound.mediaStats.episodeCount} episodes · '
+            '${compound.photos.length} photos · ${compound.music.length} tracks',
+      ),
+      (
+        _SettingsPage.ai,
+        'AI',
+        _aiKind == AiProviderKind.macStudio && _aiModelController.text.isNotEmpty
+            ? _aiModelController.text
+            : _aiKind.label,
+      ),
+      (
+        _SettingsPage.map,
+        'Map',
+        loadIonToken() == null ? '2D satellite' : 'Photoreal 3D (ion token set)',
+      ),
+      (_SettingsPage.about, 'About', 'Version, updates and mode'),
+    ];
+
+    return [
+      for (final (page, title, subtitle) in rows)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: PressScale(
+            onTap: () => setState(() => _page = page),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+              decoration: BoxDecoration(
+                color: NexusColors.surface,
+                borderRadius: BorderRadius.circular(NexusRadii.card),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: NexusText.bodyMedium),
+                        const SizedBox(height: 3),
+                        Text(subtitle, style: NexusText.footnote),
+                      ],
+                    ),
+                  ),
+                  Text('›', style: NexusText.headline.copyWith(color: NexusColors.textMuted)),
+                ],
+              ),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  /// Compound structure lives in the Buildings tab, where you can see what
+  /// you're editing. This page points there rather than duplicating the
+  /// editor somewhere it has no context.
+  List<Widget> _compoundSection(NexusDataSource store) {
+    final compound = store.compound;
+    return [
+      _infoCard(
+        'Buildings, rooms and devices',
+        'Open the Buildings tab to add or edit them - the editor lives beside '
+            'what it edits, so you can see the result immediately.\n\n'
+            'Buildings hold rooms; rooms hold lights, climate, media and grills. '
+            'Locks and gates attach to a building rather than a room.',
+        stats: [
+          ('Buildings', '${compound.buildings.length}'),
+          ('Rooms', '${compound.rooms.length}'),
+          ('Devices', '${compound.devices.length}'),
+          ('Vehicles', '${compound.vehicles.length}'),
+          ('Gates & locks', '${compound.devices.whereType<LockDevice>().length}'),
+        ],
+      ),
+    ];
+  }
+
+  /// Where the server looks for media. Only meaningful for a server this
+  /// device is running - a remote server's folders are on its own disk.
+  List<Widget> _mediaSection(NexusDataSource store) {
+    final compound = store.compound;
+    return [
+      _infoCard(
+        'Library',
+        'The server scans one folder for everything: movies, TV, photos and '
+            'music. Set it under Server → Run a server here, then rescan.',
+        stats: [
+          ('Movies', '${compound.mediaStats.movieCount}'),
+          ('Shows', '${compound.mediaStats.showCount}'),
+          ('Episodes', '${compound.mediaStats.episodeCount}'),
+          ('Photos', '${compound.photos.length}'),
+          ('Tracks', '${compound.music.length}'),
+          ('Cameras', '${compound.cameras.length}'),
+        ],
+      ),
+      const SizedBox(height: 12),
+      PressScale(
+        onTap: store.rescanLibrary,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          decoration: BoxDecoration(
+            color: NexusColors.blue.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Center(
+            child: Text('Rescan library', style: NexusText.bodyMedium.copyWith(color: NexusColors.blue)),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  Widget _infoCard(String title, String body, {List<(String, String)> stats = const []}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: NexusColors.surface,
+        borderRadius: BorderRadius.circular(NexusRadii.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: NexusText.bodyMedium),
+          const SizedBox(height: 6),
+          Text(body, style: NexusText.subhead.copyWith(color: NexusColors.textMuted)),
+          if (stats.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 18,
+              runSpacing: 10,
+              children: [
+                for (final (label, value) in stats)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(value, style: NexusText.headline),
+                      Text(label, style: NexusText.footnote),
+                    ],
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Pairing with a server that already exists (or forgetting one).
+  List<Widget> _serverSection(
+    String statusLabel,
+    Color statusColor,
+    ConnectionScope connectionScope,
+    NexusDataSource store,
+  ) {
+    return [
+      Row(
+        children: [
+          Text('Server', style: NexusText.footnote),
+          const Spacer(),
+          StatusPill(label: statusLabel, color: statusColor),
+        ],
+      ),
+      const SizedBox(height: 10),
+      Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: NexusColors.surface,
+          borderRadius: BorderRadius.circular(NexusRadii.card),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter the address of a nexus_server instance - a Tailscale name '
+              '(myhouse.tailnet-name.ts.net) for remote access, or a LAN address '
+              '(192.168.1.50:8765) at home - and the pairing token shown in its '
+              'startup log.',
+              style: NexusText.subhead,
+            ),
+            const SizedBox(height: 16),
+            Text('Server address', style: NexusText.footnote),
+            const SizedBox(height: 6),
+            _SettingsField(
+              controller: _addressController,
+              focusNode: _addressFocusNode,
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 16),
+            Text('Pairing token', style: NexusText.footnote),
+            const SizedBox(height: 6),
+            _SettingsField(
+              controller: _tokenController,
+              focusNode: _tokenFocusNode,
+              obscureText: true,
+              onChanged: (_) => setState(() {}),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(_error!, style: NexusText.footnote.copyWith(color: NexusColors.red)),
+            ],
+            const SizedBox(height: 20),
+            PressScale(
+              onTap: _canConnect ? _connect : null,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                decoration: BoxDecoration(
+                  color: _canConnect ? NexusColors.blue : NexusColors.secondarySurface,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(
+                  child: Text(
+                    _busy ? 'Connecting…' : 'Connect',
+                    style: NexusText.headline.copyWith(
+                      color: _canConnect ? const Color(0xFFFFFFFF) : NexusColors.textFaint,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (connectionScope.current != null) ...[
+              const SizedBox(height: 10),
+              PressScale(
+                onTap: _busy ? null : _forget,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    color: NexusColors.secondarySurface,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Forget This Server',
+                      style: NexusText.headline.copyWith(color: NexusColors.red),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      if (store.connectionStatus == ConnectionStatus.connected) ...[
+        const SizedBox(height: 20),
+        Text('Media Library', style: NexusText.footnote),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: NexusColors.surface,
+            borderRadius: BorderRadius.circular(NexusRadii.card),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${store.compound.mediaStats.movieCount} movies · '
+                '${store.compound.mediaStats.showCount} shows · '
+                '${store.compound.mediaStats.episodeCount} episodes',
+                style: NexusText.body,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Scanned from the folder set by NEXUS_MEDIA_ROOT on the server.',
+                style: NexusText.footnote,
+              ),
+              const SizedBox(height: 16),
+              PressScale(
+                onTap: store.rescanLibrary,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  decoration: BoxDecoration(
+                    color: NexusColors.secondarySurface,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Rescan Library',
+                      style: NexusText.headline.copyWith(color: NexusColors.blue),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+      const SizedBox(height: 20),
+    ];
+  }
+
   /// Run the bundled nexus_server on this machine and pair to it in one
   /// step, so "set up a server" doesn't mean opening a terminal.
   List<Widget> _localServerSection(LocalServerController local, ConnectionScope scope) {

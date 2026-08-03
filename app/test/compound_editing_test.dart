@@ -132,6 +132,56 @@ void main() {
     store.dispose();
   });
 
+  test('vehicles are compound-level, not filed under a building', () {
+    final store = emptyStore();
+    final truck = store.addVehicle('Ranch Truck', mapX: 0.3, mapY: 0.8);
+
+    expect(truck.id, 'ranch_truck');
+    expect(store.compound.vehicles.single.name, 'Ranch Truck');
+    expect(truck.mapX, 0.3);
+    // Removing a building must not take vehicles with it.
+    store.addBuilding('Barn');
+    store.removeBuilding('barn');
+    expect(store.compound.vehicles, hasLength(1));
+    store.dispose();
+  });
+
+  test('a gate is a lock with gate wording', () {
+    final store = emptyStore();
+    store.addBuilding('Main');
+    final gate = store.addGate('North Gate', 'main');
+
+    expect(gate.isGate, isTrue, reason: 'the UI reads Open/Closed off this');
+    expect(gate.roomId, isNull, reason: 'gates attach to the building');
+    // Same device list as everything else, so control and polling just work.
+    expect(store.compound.devices.single.id, 'north_gate');
+    store.dispose();
+  });
+
+  test('a gate can be wired to hardware like any other device', () {
+    final store = emptyStore();
+    store.addBuilding('Main');
+    final gate = store.addGate(
+      'Driveway',
+      'main',
+      endpoint: const DeviceEndpoint(protocol: DeviceProtocol.shellyGen1, host: '10.0.0.9'),
+    );
+    expect(gate.endpoint!.host, '10.0.0.9');
+    // And survives a save/load, which locks previously did not.
+    final restored = Compound.fromJson(store.compound.toJson());
+    expect((restored.devices.single as LockDevice).isGate, isTrue);
+    expect(restored.devices.single.endpoint!.host, '10.0.0.9');
+    store.dispose();
+  });
+
+  test('vehicle map positions are clamped like buildings', () {
+    final store = emptyStore();
+    final v = store.addVehicle('Stray', mapX: -2, mapY: 9);
+    expect(v.mapX, 0.05);
+    expect(v.mapY, 0.95);
+    store.dispose();
+  });
+
   test('a compound survives a JSON round trip', () {
     final store = emptyStore();
     store.addBuilding('Barn', mapX: 0.3, mapY: 0.7);

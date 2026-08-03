@@ -271,6 +271,37 @@ class _BuildingsTabState extends State<BuildingsTab> {
     );
   }
 
+  /// A gate is a lock with gate wording, so it gets its own entry rather than
+  /// making someone know that "lock" also means the driveway gate.
+  Future<void> _addGate(CompoundStore store, Building building) async {
+    final name = await promptForName(
+      context,
+      title: 'New gate',
+      subtitle: 'North Gate, Driveway - it will read Open/Closed rather than '
+          'Locked/Unlocked.',
+    );
+    if (name == null || !mounted) return;
+    final endpoint = await promptForEndpoint(context);
+    store.addGate(name, building.id, endpoint: endpoint);
+  }
+
+  /// Vehicles belong to the compound rather than a building, so they're added
+  /// here but not filed under one.
+  Future<void> _addVehicle(CompoundStore store) async {
+    final name = await promptForName(
+      context,
+      title: 'New vehicle',
+      subtitle: 'Truck, tractor, ATV - it appears on the Home map.',
+    );
+    if (name == null) return;
+    final n = store.compound.vehicles.length;
+    store.addVehicle(
+      name,
+      mapX: 0.3 + (n % 3) * 0.2,
+      mapY: 0.7 - ((n ~/ 3) % 3) * 0.2,
+    );
+  }
+
   Future<void> _renameBuilding(CompoundStore store, Building building) async {
     final name = await promptForName(
       context,
@@ -381,8 +412,18 @@ class _BuildingsTabState extends State<BuildingsTab> {
         _AddButton(label: 'Add a room', onTap: () => _addRoom(editor, building)),
         const SizedBox(height: 10),
         _AddButton(
-          label: 'Add a lock or gate',
+          label: 'Add a lock',
           onTap: () => _addDevice(editor, building, null),
+        ),
+        const SizedBox(height: 10),
+        _AddButton(
+          label: 'Add a gate',
+          onTap: () => _addGate(editor, building),
+        ),
+        const SizedBox(height: 10),
+        _AddButton(
+          label: 'Add a vehicle',
+          onTap: () => _addVehicle(editor),
         ),
         const SizedBox(height: 10),
         _AddButton(
