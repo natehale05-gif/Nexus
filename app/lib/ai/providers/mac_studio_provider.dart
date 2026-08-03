@@ -7,6 +7,33 @@ import '../ai_message.dart';
 import '../ai_provider.dart';
 import '../sse.dart';
 
+/// True for an Ollama URL pointing at this machine, so the UI can say
+/// "this machine" instead of echoing a loopback address back at the user.
+bool isLoopback(String baseUrl) {
+  final host = Uri.tryParse(baseUrl)?.host.toLowerCase() ?? '';
+  return host == 'localhost' || host == '127.0.0.1' || host == '::1';
+}
+
+/// One progress event from an Ollama model pull.
+class PullProgress {
+  const PullProgress({required this.status, this.completed, this.total});
+
+  final String status;
+  final int? completed;
+  final int? total;
+
+  /// 0..1 while layers are downloading, null during the phases Ollama reports
+  /// without byte counts (manifest, verify, extract) - a fake 0% there would
+  /// look stuck.
+  double? get fraction {
+    final done = completed, all = total;
+    if (done == null || all == null || all <= 0) return null;
+    return (done / all).clamp(0.0, 1.0);
+  }
+
+  bool get isComplete => status == 'success';
+}
+
 /// An Ollama instance, local or remote.
 ///
 /// Point [baseUrl] at `http://127.0.0.1:11434` and this is genuinely local
@@ -15,13 +42,6 @@ import '../sse.dart';
 /// original "Mac Studio" case). Uses Ollama's streaming chat endpoint
 /// (`POST /api/chat`, `stream: true`), which emits newline-delimited JSON
 /// objects, each carrying a `message.content` delta.
-/// True for an Ollama URL pointing at this machine, so the UI can say
-/// "this machine" instead of echoing a loopback address back at the user.
-bool isLoopback(String baseUrl) {
-  final host = Uri.tryParse(baseUrl)?.host.toLowerCase() ?? '';
-  return host == 'localhost' || host == '127.0.0.1' || host == '::1';
-}
-
 class MacStudioProvider implements AiProvider {
   MacStudioProvider({
     required this.baseUrl,
@@ -53,7 +73,7 @@ class MacStudioProvider implements AiProvider {
     final owned = client == null;
     final active = client ?? http.Client();
     try {
-      final uri = Uri.parse('${baseUrl.replaceAll(RegExp(r'/+\$'), '')}/api/tags');
+      final uri = Uri.parse('${baseUrl.replaceAll(RegExp(r'/+$'), '')}/api/tags');
       final response = await active.get(uri).timeout(timeout);
       if (response.statusCode != 200) return const [];
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
@@ -68,6 +88,60 @@ class MacStudioProvider implements AiProvider {
       return const [];
     } finally {
       if (owned) active.close();
+    }
+  }
+
+  /// Downloads a model into Ollama, streaming progress.
+  ///
+  /// `POST /api/pull` emits newline-delimited JSON with `status`, and for the
+  /// layer-download phase `completed`/`total` bytes. Ollama accepts Hugging
+  /// Face repos directly as `hf.co/owner/repo`, which is why pulling a model
+  /// from HF needs no downloader or GGUF loader of NEXUS's own - and why the
+  /// model lands somewhere the existing chat path can already use it.
+  static Stream<PullProgress> pullModel(
+    String baseUrl,
+    String model, {
+    http.Client Function()? clientFactory,
+  }) async* {
+    final client = (clientFactory ?? http.Client.new)();
+    try {
+      final uri = Uri.parse('${baseUrl.replaceAll(RegExp(r'/+$'), '')}/api/pull');
+      final request = http.Request('POST', uri)
+        ..headers['content-type'] = 'application/json'
+        ..body = jsonEncode({'model': model, 'stream': true});
+      final response = await client.send(request);
+
+      if (response.statusCode != 200) {
+        final body = await response.stream.bytesToString();
+        throw AiException(
+          response.statusCode == 404 ? AiErrorKind.badResponse : AiErrorKind.unreachable,
+          'Ollama',
+          'Could not pull "$model" (${response.statusCode}). $body'.trim(),
+        );
+      }
+
+      await for (final line in decodeLines(response.stream)) {
+        if (line.trim().isEmpty) continue;
+        final Map<String, dynamic> event;
+        try {
+          event = jsonDecode(line) as Map<String, dynamic>;
+        } catch (_) {
+          continue; // A partial line mid-stream isn't fatal.
+        }
+        // Ollama reports failures in-band with a 200, so this has to be
+        // checked per event rather than only on the status code.
+        final error = event['error'];
+        if (error != null) {
+          throw AiException(AiErrorKind.badResponse, 'Ollama', '$error');
+        }
+        yield PullProgress(
+          status: (event['status'] as String?) ?? '',
+          completed: (event['completed'] as num?)?.toInt(),
+          total: (event['total'] as num?)?.toInt(),
+        );
+      }
+    } finally {
+      client.close();
     }
   }
 

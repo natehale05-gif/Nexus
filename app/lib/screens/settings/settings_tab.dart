@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../ai/ai_provider.dart';
 import '../../ai/ai_settings.dart';
+import '../../ai/hugging_face.dart';
 import '../../ai/provider_registry.dart';
 import '../../ai/providers/mac_studio_provider.dart';
 import '../../state/ai_scope.dart';
@@ -48,6 +49,15 @@ class _SettingsTabState extends State<SettingsTab> {
   bool _ionSaved = true;
   List<String>? _ollamaModels;
   bool _probingOllama = false;
+  // Hugging Face model browser.
+  final _hfQueryController = TextEditingController();
+  final _hfQueryFocus = FocusNode();
+  List<HfModel>? _hfResults;
+  bool _hfSearching = false;
+  String? _hfError;
+  String? _pullingModel;
+  String _pullStatus = '';
+  double? _pullFraction;
   final _aiModelFocus = FocusNode();
   final _aiKeyFocus = FocusNode();
   final _aiUrlFocus = FocusNode();
@@ -108,6 +118,8 @@ class _SettingsTabState extends State<SettingsTab> {
     _mediaRootFocus.dispose();
     _ionTokenController.dispose();
     _ionTokenFocus.dispose();
+    _hfQueryController.dispose();
+    _hfQueryFocus.dispose();
     super.dispose();
   }
 
@@ -142,6 +154,185 @@ class _SettingsTabState extends State<SettingsTab> {
       // Fill in the URL we actually probed, so the default isn't invisible.
       if (_aiUrlController.text.trim().isEmpty) _aiUrlController.text = url;
     });
+  }
+
+
+  String get _ollamaUrl => _aiUrlController.text.trim().isEmpty
+      ? 'http://127.0.0.1:11434'
+      : _aiUrlController.text.trim();
+
+  /// Searches Hugging Face for GGUF models this Ollama can run.
+  Future<void> _searchHuggingFace() async {
+    setState(() {
+      _hfSearching = true;
+      _hfError = null;
+    });
+    final catalog = HuggingFaceCatalog();
+    try {
+      final results = await catalog.search(_hfQueryController.text);
+      if (mounted) setState(() => _hfResults = results);
+    } catch (error) {
+      if (mounted) setState(() => _hfError = '$error');
+    } finally {
+      catalog.dispose();
+      if (mounted) setState(() => _hfSearching = false);
+    }
+  }
+
+  /// Hands the Hugging Face repo to Ollama to download. Ollama takes
+  /// `hf.co/owner/repo` directly, so the model lands where the existing chat
+  /// path can already use it - no separate model store to manage.
+  Future<void> _pullModel(HfModel model) async {
+    setState(() {
+      _pullingModel = model.id;
+      _pullStatus = 'starting';
+      _pullFraction = null;
+      _hfError = null;
+    });
+    try {
+      await for (final progress in MacStudioProvider.pullModel(_ollamaUrl, model.ollamaRef)) {
+        if (!mounted) return;
+        setState(() {
+          _pullStatus = progress.status;
+          _pullFraction = progress.fraction;
+        });
+      }
+      if (!mounted) return;
+      // Select what was just downloaded and refresh the installed list, so
+      // finishing a download leaves it usable rather than needing two more taps.
+      setState(() {
+        _aiModelController.text = model.ollamaRef;
+        _aiKind = AiProviderKind.macStudio;
+        _aiSaved = false;
+      });
+      await _probeOllama();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _hfError = error is AiException ? error.displayMessage : '$error');
+      }
+    } finally {
+      if (mounted) setState(() => _pullingModel = null);
+    }
+  }
+
+  /// Browse-and-download for local models. Only meaningful for the Ollama
+  /// provider - it's Ollama that does the downloading and the running.
+  List<Widget> _huggingFaceSection() {
+    final results = _hfResults;
+    return [
+      const SizedBox(height: 18),
+      Container(height: 1, color: NexusColors.separator),
+      const SizedBox(height: 18),
+      Text('Download a model from Hugging Face', style: NexusText.bodyMedium),
+      const SizedBox(height: 4),
+      Text(
+        'Searches Hugging Face for GGUF models - the format Ollama runs - and '
+        'downloads them into the Ollama above. Nothing leaves your network once '
+        'a model is on disk.',
+        style: NexusText.footnote,
+      ),
+      const SizedBox(height: 10),
+      Row(
+        children: [
+          Expanded(
+            child: _SettingsField(
+              controller: _hfQueryController,
+              focusNode: _hfQueryFocus,
+              onChanged: (_) {},
+            ),
+          ),
+          const SizedBox(width: 8),
+          PressScale(
+            onTap: _hfSearching ? () {} : _searchHuggingFace,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: NexusColors.blue.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _hfSearching ? '…' : 'Search',
+                style: NexusText.bodyMedium.copyWith(color: NexusColors.blue),
+              ),
+            ),
+          ),
+        ],
+      ),
+      if (_hfError != null) ...[
+        const SizedBox(height: 10),
+        Text(_hfError!, style: NexusText.footnote.copyWith(color: NexusColors.red)),
+      ],
+      if (_pullingModel != null) ...[
+        const SizedBox(height: 12),
+        Text('Downloading $_pullingModel', style: NexusText.footnote),
+        const SizedBox(height: 6),
+        // A determinate bar only while Ollama reports bytes; the manifest and
+        // verify phases have no total, and a frozen 0% would look hung.
+        Container(
+          height: 6,
+          decoration: BoxDecoration(
+            color: NexusColors.secondarySurface,
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: _pullFraction ?? 0.06,
+            child: Container(
+              decoration: BoxDecoration(
+                color: NexusColors.blue,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _pullFraction == null
+              ? _pullStatus
+              : '$_pullStatus  ${(_pullFraction! * 100).round()}%',
+          style: NexusText.footnote,
+        ),
+      ],
+      if (results != null) ...[
+        const SizedBox(height: 12),
+        if (results.isEmpty)
+          Text('No GGUF models matched.', style: NexusText.footnote)
+        else
+          for (final model in results.take(8))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: PressScale(
+                onTap: _pullingModel != null ? () {} : () => _pullModel(model),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: NexusColors.secondarySurface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(model.name, style: NexusText.bodyMedium),
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          model.owner,
+                          if (model.parameterHint != null) model.parameterHint!,
+                          // Stating the RAM up front beats finding out by
+                          // watching a 40 GB download fail to load.
+                          if (estimatedRamGb(model.parameterHint) != null)
+                            '~${estimatedRamGb(model.parameterHint)!.toStringAsFixed(0)} GB RAM',
+                          '${model.downloads} downloads',
+                        ].join(' · '),
+                        style: NexusText.footnote,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+      ],
+    ];
   }
 
   Future<void> _saveAi(ProviderRegistry registry) async {
@@ -762,6 +953,7 @@ class _SettingsTabState extends State<SettingsTab> {
                   ),
                 ),
               ),
+              ..._huggingFaceSection(),
               if (_ollamaModels != null) ...[
                 const SizedBox(height: 10),
                 if (_ollamaModels!.isEmpty)
