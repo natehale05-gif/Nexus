@@ -13,6 +13,7 @@ import 'state/connection_settings.dart';
 import 'state/download_manager.dart';
 import 'state/download_scope.dart';
 import 'state/launch_pairing.dart';
+import 'state/local_ai_scope.dart';
 import 'state/local_server_scope.dart';
 import 'state/nexus_data_source.dart';
 import 'state/update_scope.dart';
@@ -42,6 +43,7 @@ class _NexusAppState extends State<NexusApp> {
   final _downloads = DownloadManager();
   final _updates = UpdateController();
   final _localServer = LocalServerController();
+  late final _localAi = LocalAiController(registry: _ai);
   late NexusDataSource _store = _createInitialDataSource();
   StoredConnection? _current;
 
@@ -218,6 +220,7 @@ class _NexusAppState extends State<NexusApp> {
     _downloads.dispose();
     _updates.dispose();
     _localServer.dispose();
+    _localAi.dispose();
     _ai.dispose();
     super.dispose();
   }
@@ -236,17 +239,20 @@ class _NexusAppState extends State<NexusApp> {
           controller: _updates,
           child: AiScope(
             registry: _ai,
-            child: DownloadScope(
-              manager: _downloads,
-              child: CompoundScope(
-                store: _store,
-                child: MaterialApp(
-                  title: 'NEXUS',
-                  debugShowCheckedModeBanner: false,
-                  theme: buildNexusTheme(),
-                  home: (_modeResolved && _mode == null)
-                      ? OnboardingScreen(onChoose: _chooseMode)
-                      : const RootShell(),
+            child: LocalAiScope(
+              controller: _localAi,
+              child: DownloadScope(
+                manager: _downloads,
+                child: CompoundScope(
+                  store: _store,
+                  child: MaterialApp(
+                    title: 'NEXUS',
+                    debugShowCheckedModeBanner: false,
+                    theme: buildNexusTheme(),
+                    home: (_modeResolved && _mode == null)
+                        ? OnboardingScreen(onChoose: _chooseMode)
+                        : const RootShell(),
+                  ),
                 ),
               ),
             ),

@@ -147,7 +147,17 @@ void main() {
     await expectLater(find.byType(NexusApp), matchesGoldenFile('goldens/pairing.png'));
   });
 
-  // The setup flow that matters most: Settings → Server.
+  // Local AI on a machine with no engine installed - the state a new user
+  // actually sees.
+  testWidgets('local-ai', (tester) async {
+    await shot(tester, NexusTab.settings, 'settings', phone);
+    await tester.tap(find.text('AI'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 600));
+    await expectLater(find.byType(NexusApp), matchesGoldenFile('goldens/local_ai.png'));
+  });
+
+  // The setup flow that matters most: Settings > Server.
   testWidgets('settings-server', (tester) async {
     await shot(tester, NexusTab.settings, 'settings', phone);
     await tester.tap(find.text('Server'));

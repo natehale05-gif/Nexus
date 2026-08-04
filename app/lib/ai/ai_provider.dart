@@ -13,10 +13,11 @@ extension AiProviderKindLabel on AiProviderKind {
       };
 
   String get label => switch (this) {
-        AiProviderKind.local => 'On-device',
-        // The id stays `mac_studio` for settings already on disk; the label
-        // reflects that this is any Ollama, including one on this machine.
-        AiProviderKind.macStudio => 'Ollama (local or remote)',
+        AiProviderKind.local => 'Built-in (no download)',
+        // The id stays `mac_studio` for settings already on disk. The label
+        // deliberately doesn't name the engine: NEXUS installs and runs it
+        // now, so which one it is stopped being the user's problem.
+        AiProviderKind.macStudio => 'Local model',
         AiProviderKind.anthropic => 'Anthropic',
         AiProviderKind.openai => 'OpenAI',
       };

@@ -13,6 +13,8 @@ import '../../state/app_mode.dart';
 import '../../state/compound_scope.dart';
 import '../../state/connection_scope.dart';
 import '../../state/connection_settings.dart';
+import '../../ai/model_catalog.dart';
+import '../../state/local_ai_scope.dart';
 import '../../state/local_server_scope.dart';
 import '../../state/map_settings.dart';
 import '../../state/nexus_data_source.dart';
@@ -56,6 +58,7 @@ class _SettingsTabState extends State<SettingsTab> {
   final _pairCodeFocus = FocusNode();
   String? _pairError;
   bool _manualEntryOpen = false;
+  bool _advancedAiOpen = false;
 
   // AI provider settings (see ai/).
   final _aiModelController = TextEditingController();
@@ -525,7 +528,10 @@ class _SettingsTabState extends State<SettingsTab> {
                           ],
                         _SettingsPage.compound => _compoundSection(store),
                         _SettingsPage.media => _mediaSection(store),
-                        _SettingsPage.ai => _aiSection(registry),
+                        _SettingsPage.ai => [
+                            ..._localAiSection(LocalAiScope.of(context), registry),
+                            ..._aiSection(registry),
+                          ],
                         _SettingsPage.map => _mapSection(),
                         _SettingsPage.about => [
                             ..._updateSection(UpdateScope.of(context)),
@@ -597,7 +603,16 @@ class _SettingsTabState extends State<SettingsTab> {
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: PressScale(
-            onTap: () => setState(() => _page = page),
+            onTap: () {
+              setState(() => _page = page);
+              // Probing sockets and stat-ing paths is cheap, but pointless
+              // for someone who never opens this page - so it happens on the
+              // way in rather than at launch.
+              if (page == _SettingsPage.ai) {
+                final ai = LocalAiScope.of(context);
+                if (ai.stage == LocalAiStage.unknown) ai.refresh();
+              }
+            },
             child: NexusCard(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
               child: Row(
@@ -1126,13 +1141,140 @@ class _SettingsTabState extends State<SettingsTab> {
     setState(() => _ionSaved = true);
   }
 
+  /// Local AI, in as few decisions as it can be reduced to.
+  ///
+  /// The old version of this screen asked you to install a separate program,
+  /// start it, discover its URL, paste that in, and then pull a model by
+  /// name - five steps, four of which are about plumbing. This is one button
+  /// until there is genuinely something to choose.
+  List<Widget> _localAiSection(LocalAiController ai, ProviderRegistry registry) {
+    if (!ai.supported) {
+      return [
+        Text('NEXUS AI'.toUpperCase(), style: NexusText.sectionHeader),
+        const SizedBox(height: 10),
+        _infoCard(
+          'Runs on your server, not here',
+          'A browser can\'t hold a model in memory. Set up local AI on the '
+              'computer running your NEXUS server and every paired device - '
+              'including this one - can use it.',
+        ),
+        const SizedBox(height: 24),
+      ];
+    }
+
+    final ram = ai.machineRam;
+    return [
+      Text('NEXUS AI'.toUpperCase(), style: NexusText.sectionHeader),
+      const SizedBox(height: 10),
+      NexusCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Run a model on this computer. Nothing leaves the '
+                    'compound, no account, no API key.',
+                    style: NexusText.subhead,
+                  ),
+                ),
+                if (ai.stage == LocalAiStage.ready) ...[
+                  const SizedBox(width: 10),
+                  StatusPill(label: 'Ready', color: NexusColors.green),
+                ],
+              ],
+            ),
+            if (ram != null) ...[
+              const SizedBox(height: 6),
+              Text('${ram.round()} GB of memory on this machine.',
+                  style: NexusText.footnote),
+            ],
+            if (ai.error != null) ...[
+              const SizedBox(height: 12),
+              Text(ai.error!, style: NexusText.footnote.copyWith(color: NexusColors.red)),
+            ],
+            if (ai.busy) ...[
+              const SizedBox(height: 14),
+              _ProgressBar(fraction: ai.progress),
+              const SizedBox(height: 6),
+              Text(
+                ai.progress == null
+                    ? ai.detail
+                    : '${ai.detail}  ${(ai.progress! * 100).round()}%',
+                style: NexusText.footnote,
+              ),
+            ] else ...[
+              switch (ai.stage) {
+                // Checking happens on its own when this page opens, so there
+                // is nothing to ask for here - just say what's happening.
+                LocalAiStage.unknown => Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text('Checking this computer…', style: NexusText.footnote),
+                  ),
+                LocalAiStage.notInstalled || LocalAiStage.failed => Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: NexusButton(
+                      label: 'Set up local AI',
+                      onTap: ai.setUp,
+                    ),
+                  ),
+                _ => const SizedBox.shrink(),
+              },
+            ],
+            if (!ai.busy &&
+                (ai.stage == LocalAiStage.noModel || ai.stage == LocalAiStage.ready)) ...[
+              const SizedBox(height: 18),
+              Text('Model'.toUpperCase(), style: NexusText.sectionHeader),
+              const SizedBox(height: 8),
+              // Named by what they are for rather than by parameter count, and
+              // greyed when this machine can't run them well - a model that
+              // swaps reads as broken, not slow.
+              for (final model in localModelCatalog)
+                _ModelRow(
+                  model: model,
+                  installed: ai.installedModels.any((m) => m.startsWith(model.id.split(':').first)),
+                  recommended: model.id == ai.recommended.id,
+                  fits: model.fitsIn(ram),
+                  active: registry.activeModel == model.id,
+                  onTap: () => ai.downloadModel(model),
+                ),
+              if (ai.installedModels.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text('On this computer', style: NexusText.footnote),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final model in ai.installedModels)
+                      _AiProviderChip(
+                        label: model,
+                        selected: registry.activeModel == model,
+                        onTap: () => ai.selectModel(model),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+      const SizedBox(height: 24),
+    ];
+  }
+
   List<Widget> _aiSection(ProviderRegistry registry) {
     final needsCredential = _aiKind != AiProviderKind.local;
     final isKeyProvider = _aiKind == AiProviderKind.anthropic || _aiKind == AiProviderKind.openai;
     return [
-      Text('AI Model'.toUpperCase(), style: NexusText.sectionHeader),
-      const SizedBox(height: 10),
-      NexusCard(
+      // Collapsed by default. Cloud keys and hand-configured engines are real
+      // options, but putting four radio buttons above "Set up local AI" makes
+      // a one-button feature look like a configuration screen.
+      _ExpandingSection(
+        title: 'Advanced - cloud keys, other engines',
+        expanded: _advancedAiOpen,
+        onToggle: () => setState(() => _advancedAiOpen = !_advancedAiOpen),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1249,7 +1391,132 @@ class _SettingsTabState extends State<SettingsTab> {
   }
 }
 
+
 /// A pill for picking the active AI provider.
+/// A determinate bar while there are bytes to count, indeterminate-looking
+/// otherwise. A frozen 0% during a phase with no measurable size reads as
+/// hung, which on a multi-gigabyte download is the difference between waiting
+/// and force-quitting.
+class _ProgressBar extends StatelessWidget {
+  const _ProgressBar({required this.fraction});
+
+  final double? fraction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 6,
+      decoration: BoxDecoration(
+        color: NexusColors.secondarySurface,
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: FractionallySizedBox(
+        alignment: Alignment.centerLeft,
+        widthFactor: fraction ?? 0.08,
+        child: Container(
+          decoration: BoxDecoration(
+            color: NexusColors.blue,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One model in the picker: what it's for, what it costs, and whether this
+/// machine can actually run it.
+class _ModelRow extends StatelessWidget {
+  const _ModelRow({
+    required this.model,
+    required this.installed,
+    required this.recommended,
+    required this.fits,
+    required this.active,
+    required this.onTap,
+  });
+
+  final LocalModel model;
+  final bool installed;
+  final bool recommended;
+  final bool fits;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = [
+      if (installed) 'Installed' else '${formatGb(model.downloadGb)} download',
+      '${model.needsRamGb.round()} GB memory',
+    ].join(' · ');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Opacity(
+        // Dimmed rather than hidden: knowing a bigger model exists, and that
+        // this machine is why it's unavailable, is useful information.
+        opacity: fits ? 1 : 0.45,
+        child: PressScale(
+          onTap: fits ? onTap : () {},
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: active
+                  ? NexusColors.blue.withValues(alpha: 0.10)
+                  : NexusColors.secondarySurface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: active ? NexusColors.blue : const Color(0x00000000),
+                width: 1.4,
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(model.name, style: NexusText.bodyMedium),
+                          if (recommended && fits) ...[
+                            const SizedBox(width: 8),
+                            StatusPill(
+                              label: 'Recommended',
+                              color: NexusColors.blue,
+                              dense: true,
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(model.blurb, style: NexusText.footnote),
+                      const SizedBox(height: 2),
+                      Text(subtitle, style: NexusText.footnote),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  active
+                      ? 'In use'
+                      : fits
+                          ? (installed ? 'Use' : 'Get')
+                          : 'Too big',
+                  style: NexusText.footnote.copyWith(
+                    color: active ? NexusColors.blue : NexusColors.textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A collapsed card that opens on tap.
 ///
 /// For the paths that have to exist but shouldn't be the first thing anyone

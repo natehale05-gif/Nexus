@@ -516,18 +516,44 @@ working view (operating a building room by room).
 
 ## Multi-provider AI (NEXUS tab)
 
-**For a genuinely local model, use the Ollama provider pointed at
-`http://127.0.0.1:11434`.** That's real local inference on the machine running
-NEXUS - no API key, no cloud. **Settings → AI Model → Detect installed
-models** asks that Ollama what it actually has (`GET /api/tags`) and lets you
-pick from the list, rather than typing a name blind and getting an opaque 404
-at chat time. The same provider handles a remote Ollama over Tailscale; only
-the URL differs.
+### Local AI, without setting anything up
 
-The **On-device** provider is *not* a neural model - it's a rule-based
-responder that works fully offline and knows the house state. Real on-device
-inference (llama.cpp/MLX via FFI) is a per-platform native effort that isn't
-built here; Ollama on localhost is the working answer today.
+**Settings > AI > Set up local AI.** That's the whole flow. NEXUS fetches an
+inference engine, starts it, and shows four models named for what they're for
+rather than by parameter count - with the download size, the memory each
+wants, and the one this machine should pick already marked. Choose one, watch
+a progress bar, and the NEXUS tab is answering from a model on your own
+hardware. No terminal, no second app to install, no URL to paste, no API key.
+
+How it actually works, since the parts are deliberate:
+
+- **It looks before it downloads.** An engine already answering on this
+  machine gets used as-is, and an engine that's installed but stopped just
+  gets started. Only a machine with neither downloads anything.
+- **It runs on a private port** (`127.0.0.1:11435`), so NEXUS never fights an
+  engine you run yourself on the conventional one, and loopback-only so
+  nothing off this machine can drive it.
+- **Models live with NEXUS's data**, not in the engine's default location, so
+  uninstalling doesn't strand tens of gigabytes somewhere you'll never find,
+  and updating NEXUS doesn't delete a model you waited an hour for.
+- **The recommendation is by memory, not by "biggest".** A model that swaps
+  produces an assistant that takes a minute to answer, which reads as broken
+  rather than slow - so the picker greys out what won't run well here and says
+  why.
+- **Which engine it is doesn't appear anywhere in the UI.** It's Ollama today;
+  that's an implementation detail, pinned in
+  `app/lib/ai/runtime/runtime_release.dart`, and the point of this feature is
+  that it stopped being your problem.
+
+Desktop only - a browser can't hold a model in memory, and a phone shouldn't
+be downloading 5 GB. Set local AI up on the machine running your server and
+every paired device uses it through that server.
+
+The Hugging Face browser is still there under **Advanced** for anyone who
+wants a specific GGUF repo, along with cloud keys and a hand-entered engine
+URL. The **Built-in** provider is *not* a neural model - it's a rule-based
+responder that works fully offline and knows the house state, which is what
+answers before you've downloaded anything.
 
 
 The NEXUS AI tab routes chat through a pluggable provider abstraction
@@ -539,9 +565,10 @@ implementations:
   backed today by NEXUS's built-in house-aware rule-based responder (a real
   offline option). The same interface is designed to later host a neural
   on-device model (llama.cpp / MLX) with no call-site changes.
-- **Mac Studio** (`mac_studio`) - a remote Ollama instance over a user-set
-  base URL (`http://<host>:11434`), reached over Tailscale. Streams Ollama's
-  NDJSON chat API.
+- **Local model** (`mac_studio`) - the engine NEXUS manages on this machine,
+  or any other Ollama-compatible endpoint over a user-set base URL, including
+  one reached over Tailscale. Streams the NDJSON chat API. The id stays
+  `mac_studio` so settings already on disk keep working.
 - **Anthropic** - `api.anthropic.com/v1/messages`, SSE streaming.
 - **OpenAI** - `api.openai.com/v1/chat/completions`, SSE streaming.
 
