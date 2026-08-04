@@ -46,6 +46,8 @@ enum NexusGlyph {
   gear,
   download,
   trash,
+  folder,
+  photo,
 }
 
 /// A single bespoke stroke icon rendered with [CustomPainter].
@@ -197,8 +199,56 @@ class _NexusIconPainter extends CustomPainter {
         _paintDownload(canvas, rect);
       case NexusGlyph.trash:
         _paintTrash(canvas, rect);
+      case NexusGlyph.folder:
+        _paintFolder(canvas, rect);
+      case NexusGlyph.photo:
+        _paintPhoto(canvas, rect);
     }
     canvas.restore();
+  }
+
+  /// A folder with the raised tab on the left, the shape everything from
+  /// Finder to Files uses - recognisable at 20px, which a literal drawing of a
+  /// manila folder is not.
+  void _paintFolder(Canvas canvas, Rect r) {
+    final top = r.top + r.height * 0.18;
+    final path = Path()
+      ..moveTo(r.left, top + r.height * 0.1)
+      ..lineTo(r.left, r.bottom - r.height * 0.08)
+      ..lineTo(r.right, r.bottom - r.height * 0.08)
+      ..lineTo(r.right, top)
+      ..lineTo(r.left + r.width * 0.46, top)
+      ..lineTo(r.left + r.width * 0.36, top - r.height * 0.1)
+      ..lineTo(r.left, top - r.height * 0.1)
+      ..close();
+    canvas.drawPath(path, _stroke);
+  }
+
+  /// A frame with a horizon and a sun: a picture, rather than a camera, so it
+  /// doesn't read as the Security tab.
+  void _paintPhoto(Canvas canvas, Rect r) {
+    final frame = Rect.fromLTRB(
+      r.left,
+      r.top + r.height * 0.08,
+      r.right,
+      r.bottom - r.height * 0.08,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(frame, Radius.circular(r.width * 0.14)),
+      _stroke,
+    );
+    canvas.drawCircle(
+      Offset(frame.left + frame.width * 0.31, frame.top + frame.height * 0.32),
+      r.width * 0.09,
+      _stroke,
+    );
+    canvas.drawPath(
+      Path()
+        ..moveTo(frame.left + frame.width * 0.08, frame.bottom - frame.height * 0.16)
+        ..lineTo(frame.left + frame.width * 0.42, frame.top + frame.height * 0.52)
+        ..lineTo(frame.right - frame.width * 0.08, frame.bottom - frame.height * 0.16),
+      _stroke,
+    );
   }
 
   void _paintBulb(Canvas canvas, Rect r) {

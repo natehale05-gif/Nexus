@@ -64,6 +64,9 @@ void main() {
     _stubPlugins();
   });
 
+  /// The way past onboarding into something with content in it.
+  final demoLink = find.text('Just looking? Open the example compound');
+
   Future<void> shot(WidgetTester tester, NexusTab tab, String name, Size size) async {
     await tester.binding.setSurfaceSize(size);
     tester.view.physicalSize = size;
@@ -73,8 +76,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
 
     // First run lands on onboarding; take the demo so there's content.
-    if (find.text('Open demo').evaluate().isNotEmpty) {
-      await tester.tap(find.text('Open demo'));
+    if (demoLink.evaluate().isNotEmpty) {
+      await tester.tap(demoLink);
       await tester.pump(const Duration(milliseconds: 600));
     }
 
@@ -94,13 +97,14 @@ void main() {
 
   const phone = Size(390, 844);
 
+
   // Onboarding is deliberately not captured: it is the one screen with no
   // interaction, and static text laid out on a test's first frame keeps the
   // engine's box-glyph font no matter how many frames are pumped after it.
   testWidgets('home', (t) => shot(t, NexusTab.home, 'home', phone));
-  testWidgets('buildings', (t) => shot(t, NexusTab.buildings, 'buildings', phone));
+  testWidgets('drive', (t) => shot(t, NexusTab.drive, 'drive', phone));
   testWidgets('security', (t) => shot(t, NexusTab.security, 'security', phone));
-  testWidgets('media', (t) => shot(t, NexusTab.media, 'media', phone));
+  testWidgets('tv', (t) => shot(t, NexusTab.tv, 'tv', phone));
   testWidgets('ai', (t) => shot(t, NexusTab.nexusAi, 'ai', phone));
   testWidgets('settings', (t) => shot(t, NexusTab.settings, 'settings', phone));
   testWidgets('wide', (t) => shot(t, NexusTab.settings, 'wide', const Size(1200, 820)));
@@ -135,7 +139,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     await tester.pumpWidget(const NexusApp());
     await tester.pump(const Duration(milliseconds: 600));
-    await tester.tap(find.text('Open demo'));
+    await tester.tap(demoLink);
     await tester.pump(const Duration(milliseconds: 600));
     await tester.tap(
       find.descendant(of: find.byType(NexusTabBar), matching: find.text('Settings')),

@@ -9,7 +9,11 @@ import '../theme/tokens.dart';
 import '../widgets/press_scale.dart';
 
 /// The top-level sections.
-enum NexusTab { home, buildings, security, media, nexusAi, settings }
+///
+/// Buildings is deliberately not one. The map *is* how you get to a building,
+/// and from there to its rooms and their devices - having a parallel list tab
+/// meant two front doors to the same hierarchy and no room for Drive.
+enum NexusTab { home, security, tv, drive, nexusAi, settings }
 
 class NexusTabSpec {
   const NexusTabSpec(this.tab, this.label, this.glyph);
@@ -20,9 +24,9 @@ class NexusTabSpec {
 
 const List<NexusTabSpec> nexusTabs = [
   NexusTabSpec(NexusTab.home, 'Home', NexusGlyph.mapPinBase),
-  NexusTabSpec(NexusTab.buildings, 'Buildings', NexusGlyph.gate),
   NexusTabSpec(NexusTab.security, 'Security', NexusGlyph.camera),
-  NexusTabSpec(NexusTab.media, 'Media', NexusGlyph.tv),
+  NexusTabSpec(NexusTab.tv, 'TV', NexusGlyph.tv),
+  NexusTabSpec(NexusTab.drive, 'Drive', NexusGlyph.folder),
   NexusTabSpec(NexusTab.nexusAi, 'NEXUS', NexusGlyph.sparkle),
   NexusTabSpec(NexusTab.settings, 'Settings', NexusGlyph.gear),
 ];

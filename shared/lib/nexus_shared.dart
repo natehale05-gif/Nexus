@@ -9,6 +9,7 @@ export 'src/camera.dart';
 export 'src/compound.dart';
 export 'src/demo_seed.dart';
 export 'src/device.dart';
+export 'src/drive.dart';
 export 'src/discovery.dart';
 export 'src/empty_seed.dart';
 export 'src/endpoint.dart';

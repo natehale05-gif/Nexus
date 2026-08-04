@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
+import 'package:nexus_server/files/drive_store.dart';
 import 'package:nexus_server/auth/auth_middleware.dart';
 import 'package:nexus_server/auth/pairing_token.dart';
 import 'package:nexus_server/config.dart';
@@ -56,7 +57,10 @@ Future<void> main(List<String> args) async {
 
   final dispatcher = CommandDispatcher(server, integrations, library);
   final wsHub = WebSocketHub(server, dispatcher, integrations.ollama, pairingToken);
-  final restApi = RestApi(server, dispatcher, integrations.ollama, library, pairingToken);
+  final drive = DriveStore(config.driveRoot);
+  log('drive at ${config.driveRoot}', name: 'nexus.server');
+  final restApi =
+      RestApi(server, dispatcher, integrations.ollama, library, pairingToken, drive);
   final ticker = SimulationTicker(server);
 
   Timer? saveTimer;

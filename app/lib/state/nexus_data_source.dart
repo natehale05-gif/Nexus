@@ -76,6 +76,26 @@ abstract class NexusDataSource extends ChangeNotifier {
   /// a placeholder rather than attempting playback.
   Uri? mediaStreamUri(String itemId);
 
+  // ---- Drive: personal files on the server -------------------------------
+  // Only a paired server has files; without one these report "nothing here"
+  // rather than pretending, so the Drive tab can say so plainly.
+
+  /// One folder's contents, or null when there's no server to ask.
+  Future<DriveListing?> listDrive(String path) async => null;
+
+  /// A URL that will serve [path] - for an image tile, a video player, or a
+  /// download. Null when there's no server.
+  Uri? driveFileUri(String path) => null;
+
+  /// Creates a folder. Returns false when it couldn't be done.
+  Future<bool> createDriveFolder(String path) async => false;
+
+  /// Deletes a file or an empty folder.
+  Future<bool> deleteDriveEntry(String path) async => false;
+
+  /// Uploads [bytes] to [path], overwriting what's there.
+  Future<bool> uploadDriveFile(String path, List<int> bytes) async => false;
+
   void turnOffAllLights();
 
   void addDevice(Device device);

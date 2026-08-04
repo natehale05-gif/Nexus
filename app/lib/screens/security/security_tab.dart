@@ -24,8 +24,12 @@ String _timeAgo(DateTime time) {
   return '${diff.inDays}d ago';
 }
 
-/// Security tab (Section 5): active alerts (level != info) first, then a
-/// 2-column camera grid.
+/// Security: active alerts first, then a wall of live camera feeds.
+///
+/// Every configured camera streams at once. A grid of still thumbnails you
+/// have to tap one at a time is a gallery; the point of a security tab is
+/// seeing the whole compound in one glance. Tapping enlarges one to fill the
+/// tab, and tapping again puts it back.
 class SecurityTab extends StatefulWidget {
   const SecurityTab({super.key});
 
@@ -34,7 +38,8 @@ class SecurityTab extends StatefulWidget {
 }
 
 class _SecurityTabState extends State<SecurityTab> {
-  String? _expandedCamera;
+  /// Null means "the wall", a value means one camera filling the screen.
+  String? _fullscreenCamera;
 
   @override
   Widget build(BuildContext context) {
@@ -92,22 +97,26 @@ class _SecurityTabState extends State<SecurityTab> {
                       )
                     else
                       GridView.count(
-                        crossAxisCount: 2,
+                        // One column when a camera is full-screen, two
+                        // otherwise: a wall you can actually watch, rather
+                        // than one feed at a time behind a tap.
+                        crossAxisCount: _fullscreenCamera == null ? 2 : 1,
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         mainAxisSpacing: 12,
                         crossAxisSpacing: 12,
-                        childAspectRatio: 1.25,
+                        childAspectRatio: _fullscreenCamera == null ? 1.25 : 1.6,
                         children: [
                           for (final camera in cameras)
-                            _CameraTile(
-                              camera: camera,
-                              expanded: _expandedCamera == camera.id,
-                              onTap: () => setState(
-                                () => _expandedCamera =
-                                    _expandedCamera == camera.id ? null : camera.id,
+                            if (_fullscreenCamera == null || _fullscreenCamera == camera.id)
+                              _CameraTile(
+                                camera: camera,
+                                enlarged: _fullscreenCamera == camera.id,
+                                onTap: () => setState(
+                                  () => _fullscreenCamera =
+                                      _fullscreenCamera == camera.id ? null : camera.id,
+                                ),
                               ),
-                            ),
                         ],
                       ),
                   ],
@@ -165,14 +174,16 @@ class _AlertCard extends StatelessWidget {
   }
 }
 
-/// A camera tile. When the server has a stream URL configured for this
-/// camera, tapping it plays the live feed inline; otherwise it says so
-/// plainly rather than dead-ending.
+/// One live feed. Starts playing as soon as it is on screen; a camera with no
+/// stream URL configured says so plainly rather than dead-ending.
 class _CameraTile extends StatefulWidget {
-  const _CameraTile({required this.camera, required this.expanded, required this.onTap});
+  const _CameraTile({required this.camera, required this.enlarged, required this.onTap});
 
   final Camera camera;
-  final bool expanded;
+
+  /// True when this one is filling the tab; changes the aspect ratio, not
+  /// whether it is streaming.
+  final bool enlarged;
   final VoidCallback onTap;
 
   @override
@@ -184,12 +195,19 @@ class _CameraTileState extends State<_CameraTile> {
   VideoController? _controller;
 
   @override
+  void initState() {
+    super.initState();
+    // Security is a wall of live feeds, not a gallery of thumbnails you tap
+    // one at a time - so every camera starts streaming as soon as it appears.
+    if (widget.camera.isStreamable) _startStream();
+  }
+
+  @override
   void didUpdateWidget(covariant _CameraTile oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.expanded && widget.camera.isStreamable) {
-      _startStream();
-    } else if (!widget.expanded) {
+    if (widget.camera.streamUrl != oldWidget.camera.streamUrl) {
       _stopStream();
+      if (widget.camera.isStreamable) _startStream();
     }
   }
 
@@ -278,7 +296,7 @@ class _CameraTileState extends State<_CameraTile> {
                 ),
               ),
             ),
-            if (widget.expanded && !camera.isStreamable)
+            if (!camera.isStreamable)
               Positioned.fill(
                 child: Container(
                   color: NexusColors.overlayScrim,

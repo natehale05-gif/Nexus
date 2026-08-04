@@ -5,6 +5,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 
 import '../auth/pairing_token.dart';
+import '../files/drive_store.dart';
 import '../integrations/ollama_bridge.dart';
 import '../media/library_index.dart';
 import '../discovery/discovery_service.dart';
@@ -36,7 +37,8 @@ class RestApi {
     this.dispatcher,
     this.ollama,
     this.library,
-    this.pairingToken, {
+    this.pairingToken,
+    this.drive, {
     DiscoveryService? discovery,
   }) : discovery = discovery ?? DiscoveryService();
 
@@ -45,6 +47,7 @@ class RestApi {
   final OllamaBridge ollama;
   final LibraryIndex library;
   final PairingToken pairingToken;
+  final DriveStore drive;
   final DiscoveryService discovery;
 
   Handler get handler {
@@ -130,6 +133,86 @@ class RestApi {
             'content-range': 'bytes $start-$end/$length',
             'content-length': '${end - start + 1}',
           });
+    });
+
+    // ---- Drive: personal files -------------------------------------------
+    // Listing is behind the normal bearer auth. Downloading is not, for the
+    // same reason media streaming isn't: an <img> or a video element can't
+    // attach a header, so a file gets a per-path token derived from the
+    // pairing token instead.
+    router.get('/drive/list', (Request request) {
+      final listing = drive.list(request.url.queryParameters['path'] ?? '');
+      if (listing == null) {
+        return Response(400, body: jsonEncode({'error': 'Bad path'}), headers: _json);
+      }
+      return Response.ok(jsonEncode(listing.toJson()), headers: _json);
+    });
+
+    router.get('/drive/file', (Request request) async {
+      final path = request.url.queryParameters['path'] ?? '';
+      final expected = mediaStreamToken(pairingToken.value, 'drive:$path');
+      if (request.url.queryParameters['token'] != expected) {
+        return Response.forbidden('Invalid or missing token');
+      }
+      final file = drive.file(path);
+      if (file == null) return Response.notFound('No such file');
+      final length = await file.length();
+      final contentType = _contentTypeFor(path);
+
+      // Same range handling as media, so video in Drive seeks too.
+      final rangeHeader = request.headers['range'];
+      if (rangeHeader == null) {
+        return Response.ok(file.openRead(), headers: {
+          'content-type': contentType,
+          'accept-ranges': 'bytes',
+          'content-length': '$length',
+        });
+      }
+      final range = _parseRange(rangeHeader, length);
+      if (range == null) {
+        return Response(416, headers: {'content-range': 'bytes */$length'});
+      }
+      final (start, end) = range;
+      return Response(206,
+          body: file.openRead(start, end + 1),
+          headers: {
+            'content-type': contentType,
+            'accept-ranges': 'bytes',
+            'content-range': 'bytes $start-$end/$length',
+            'content-length': '${end - start + 1}',
+          });
+    });
+
+    router.post('/drive/folder', (Request request) async {
+      final body = await request.readAsString();
+      final args = body.isEmpty ? <String, dynamic>{} : (jsonDecode(body) as Map).cast<String, dynamic>();
+      final ok = drive.createFolder(args['path'] as String? ?? '');
+      return ok
+          ? Response.ok(jsonEncode({'ok': true}), headers: _json)
+          : Response(400, body: jsonEncode({'error': 'Bad path'}), headers: _json);
+    });
+
+    router.post('/drive/upload', (Request request) async {
+      final path = request.url.queryParameters['path'] ?? '';
+      final sink = drive.openForWrite(path);
+      if (sink == null) {
+        return Response(400, body: jsonEncode({'error': 'Bad path'}), headers: _json);
+      }
+      try {
+        await request.read().pipe(sink);
+      } catch (error) {
+        return Response(500, body: jsonEncode({'error': '$error'}), headers: _json);
+      }
+      return Response.ok(jsonEncode({'ok': true}), headers: _json);
+    });
+
+    router.post('/drive/delete', (Request request) async {
+      final body = await request.readAsString();
+      final args = body.isEmpty ? <String, dynamic>{} : (jsonDecode(body) as Map).cast<String, dynamic>();
+      final ok = drive.delete(args['path'] as String? ?? '');
+      return ok
+          ? Response.ok(jsonEncode({'ok': true}), headers: _json)
+          : Response(400, body: jsonEncode({'error': 'Could not delete that'}), headers: _json);
     });
 
     return router.call;

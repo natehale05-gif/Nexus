@@ -13,6 +13,7 @@ class ServerConfig {
     required this.restPort,
     required this.dataDir,
     required this.mediaRoot,
+    required this.driveRoot,
     required this.cameras,
   });
 
@@ -25,6 +26,9 @@ class ServerConfig {
       restPort: int.tryParse(env['NEXUS_REST_PORT'] ?? '') ?? 8766,
       dataDir: dataDir,
       mediaRoot: env['NEXUS_MEDIA_ROOT'] ?? '$dataDir/media',
+      // Personal files, kept apart from the scanned media library: one is
+      // yours to arrange, the other is the server's to index.
+      driveRoot: env['NEXUS_DRIVE_ROOT'] ?? '$dataDir/drive',
       cameras: parseCameras(env['NEXUS_CAMERAS']),
     );
   }
@@ -63,6 +67,7 @@ class ServerConfig {
   /// `media/` folder inside the data dir, which will just be empty until
   /// configured.
   final String mediaRoot;
+  final String driveRoot;
 
   /// Security cameras declared via `NEXUS_CAMERAS` (see [parseCameras]).
   final List<Camera> cameras;

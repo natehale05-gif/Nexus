@@ -15,18 +15,19 @@ import '../../widgets/press_scale.dart';
 import '../security/tab_header.dart';
 import '../../widgets/nexus_card.dart';
 
-/// Media tab (Section 5): Now Playing hero (real playback when connected to
-/// a server with a scanned library - see `server/lib/media/`), 3-stat row,
-/// a Downloaded section (native devices - titles saved for offline
-/// playback), and a Continue Watching grid (tap a tile to play it).
-class MediaTab extends StatefulWidget {
-  const MediaTab({super.key});
+/// TV: everything watchable that lives on the server.
+///
+/// Films and episodes only. Photos and music moved to Drive, which is where
+/// personal media belongs - the distinction people actually make is "things I
+/// sit down and watch" against "my own stuff", not "video" against "audio".
+class TvTab extends StatefulWidget {
+  const TvTab({super.key});
 
   @override
-  State<MediaTab> createState() => _MediaTabState();
+  State<TvTab> createState() => _TvTabState();
 }
 
-class _MediaTabState extends State<MediaTab> {
+class _TvTabState extends State<TvTab> {
   /// A locally-chosen "now playing" - set when a downloaded title is tapped,
   /// so it plays from disk even with no server reachable (the server-driven
   /// `compound.nowPlaying` needs a live connection). Cleared when a
@@ -67,7 +68,7 @@ class _MediaTabState extends State<MediaTab> {
           color: NexusColors.background,
           child: Column(
             children: [
-              const TabHeader(title: 'Media', pillLabel: 'Library', pillColor: NexusColors.purple),
+              const TabHeader(title: 'TV', pillLabel: 'Library', pillColor: NexusColors.purple),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
@@ -98,22 +99,6 @@ class _MediaTabState extends State<MediaTab> {
                               ),
                             ),
                         ],
-                      ),
-                    ],
-                    if (compound.photos.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      Text('Photos'.toUpperCase(), style: NexusText.sectionHeader),
-                      const SizedBox(height: 10),
-                      _PhotoGrid(photos: compound.photos, store: store),
-                    ],
-                    if (compound.music.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      Text('Music'.toUpperCase(), style: NexusText.sectionHeader),
-                      const SizedBox(height: 10),
-                      _MusicList(
-                        tracks: compound.music,
-                        store: store,
-                        onPlay: (entry) => _playStreaming(entry.id, store),
                       ),
                     ],
                     const SizedBox(height: 20),
@@ -571,186 +556,6 @@ class _ProgressRingPainter extends CustomPainter {
 /// Photos as a square thumbnail grid, loaded straight from the server's
 /// media stream endpoint (same per-item token as video). Tapping one opens
 /// it full-screen.
-class _PhotoGrid extends StatelessWidget {
-  const _PhotoGrid({required this.photos, required this.store});
-
-  final List<LibraryEntry> photos;
-  final NexusDataSource store;
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      children: [
-        for (final photo in photos)
-          PressScale(
-            onTap: () => _openViewer(context, photo),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: _PhotoThumb(uri: store.mediaStreamUri(photo.id)),
-            ),
-          ),
-      ],
-    );
-  }
-
-  void _openViewer(BuildContext context, LibraryEntry photo) {
-    final uri = store.mediaStreamUri(photo.id);
-    if (uri == null) return;
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierColor: const Color(0xE6000000),
-        pageBuilder: (context, _, _) => _PhotoViewer(title: photo.title, uri: uri),
-      ),
-    );
-  }
-}
-
-class _PhotoThumb extends StatelessWidget {
-  const _PhotoThumb({required this.uri});
-
-  final Uri? uri;
-
-  @override
-  Widget build(BuildContext context) {
-    if (uri == null) {
-      // Local-demo-mode: no server to fetch from.
-      return Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF2A3150), NexusColors.mapBaseDeep],
-          ),
-        ),
-        child: Center(
-          child: NexusIcon(
-            NexusGlyph.tv,
-            size: 18,
-            color: const Color(0xFFFFFFFF).withValues(alpha: 0.22),
-          ),
-        ),
-      );
-    }
-    return Image.network(
-      uri.toString(),
-      fit: BoxFit.cover,
-      errorBuilder: (context, _, _) => Container(
-        color: NexusColors.secondarySurface,
-        child: Center(child: NexusIcon(NexusGlyph.close, size: 16, color: NexusColors.textFaint)),
-      ),
-      loadingBuilder: (context, child, progress) =>
-          progress == null ? child : Container(color: NexusColors.secondarySurface),
-    );
-  }
-}
-
-/// Full-screen photo, tap anywhere to dismiss.
-class _PhotoViewer extends StatelessWidget {
-  const _PhotoViewer({required this.title, required this.uri});
-
-  final String title;
-  final Uri uri;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.of(context).maybePop(),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                title,
-                style: NexusText.headline.copyWith(color: const Color(0xFFFFFFFF)),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            Expanded(child: Center(child: Image.network(uri.toString(), fit: BoxFit.contain))),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('Tap to close', style: NexusText.footnote),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Music tracks as a tappable list - playback runs through the same player
-/// as video (audio-only media just renders no video surface).
-class _MusicList extends StatelessWidget {
-  const _MusicList({required this.tracks, required this.store, required this.onPlay});
-
-  final List<LibraryEntry> tracks;
-  final NexusDataSource store;
-  final ValueChanged<LibraryEntry> onPlay;
-
-  String _duration(double seconds) {
-    if (seconds <= 0) return '';
-    final total = seconds.round();
-    final minutes = total ~/ 60;
-    final secs = (total % 60).toString().padLeft(2, '0');
-    return '$minutes:$secs';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: NexusColors.surface,
-        borderRadius: BorderRadius.circular(NexusRadii.card),
-        boxShadow: NexusShadows.card,
-      ),
-      child: Column(
-        children: [
-          for (var i = 0; i < tracks.length; i++) ...[
-            if (i > 0) Container(height: 1, color: NexusColors.separator),
-            PressScale(
-              onTap: () => onPlay(tracks[i]),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Row(
-                  children: [
-                    NexusIcon(NexusGlyph.playFill, size: 14, color: NexusColors.purple),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(tracks[i].title,
-                              style: NexusText.bodyMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          if ((tracks[i].subtitle ?? '').isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(tracks[i].subtitle!,
-                                style: NexusText.footnote, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(_duration(tracks[i].durationSeconds), style: NexusText.footnote),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _StatsRow extends StatelessWidget {
   const _StatsRow({required this.stats});
 

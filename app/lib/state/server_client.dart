@@ -324,6 +324,71 @@ class ServerClient extends NexusDataSource {
   @override
   void rescanLibrary() => _send('rescanLibrary', const {});
 
+  // ---- Drive -------------------------------------------------------------
+
+  @override
+  Future<DriveListing?> listDrive(String path) async {
+    try {
+      final response = await http.get(
+        _restBaseUri().replace(path: '/drive/list', queryParameters: {'path': path}),
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) return null;
+      return DriveListing.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    } catch (_) {
+      // Unreachable server: null means "couldn't look", which the UI shows
+      // differently from an empty folder.
+      return null;
+    }
+  }
+
+  /// A per-path token, derived the same way media stream tokens are.
+  ///
+  /// An <img> or a video element can't attach an Authorization header, so the
+  /// URL has to carry its own proof. Per-path means a URL that leaks exposes
+  /// one file rather than the whole pairing.
+  @override
+  Uri? driveFileUri(String path) {
+    final fileToken = sha256.convert(utf8.encode('$token:drive:$path')).toString();
+    return _restBaseUri().replace(
+      path: '/drive/file',
+      queryParameters: {'path': path, 'token': fileToken},
+    );
+  }
+
+  @override
+  Future<bool> createDriveFolder(String path) => _drivePost('/drive/folder', {'path': path});
+
+  @override
+  Future<bool> deleteDriveEntry(String path) => _drivePost('/drive/delete', {'path': path});
+
+  Future<bool> _drivePost(String path, Map<String, dynamic> body) async {
+    try {
+      final response = await http.post(
+        _restBaseUri().replace(path: path),
+        headers: {'Authorization': 'Bearer $token', 'content-type': 'application/json'},
+        body: jsonEncode(body),
+      ).timeout(const Duration(seconds: 15));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> uploadDriveFile(String path, List<int> bytes) async {
+    try {
+      final response = await http.post(
+        _restBaseUri().replace(path: '/drive/upload', queryParameters: {'path': path}),
+        headers: {'Authorization': 'Bearer $token'},
+        body: bytes,
+      ).timeout(const Duration(minutes: 10));
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   Future<List<DiscoveredDevice>> discoverDevices() async {
     final uri = _restBaseUri().replace(
