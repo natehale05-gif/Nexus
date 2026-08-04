@@ -79,6 +79,7 @@ class _DiscoveryDialogState extends State<_DiscoveryDialog> {
             decoration: BoxDecoration(
               color: NexusColors.surface,
               borderRadius: BorderRadius.circular(NexusRadii.card),
+              boxShadow: NexusShadows.raised,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,

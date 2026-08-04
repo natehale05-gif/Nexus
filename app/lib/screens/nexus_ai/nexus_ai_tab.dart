@@ -1,23 +1,35 @@
 import 'package:flutter/widgets.dart';
+import 'package:nexus_shared/nexus_shared.dart';
 import '../../ai/actions.dart';
 import '../../ai/ai_message.dart';
 import '../../ai/ai_provider.dart';
 import '../../icons/nexus_icons.dart';
 import '../../state/ai_scope.dart';
+import '../../state/compound_scope.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/press_scale.dart';
 import '../security/tab_header.dart';
 import 'chat_engine.dart';
 
-const _suggestions = [
-  'Turn off all lights',
-  'Where is the F-250?',
-  'Open barn gate',
-  "What's playing?",
-  'Any alerts?',
-  'Run movie mode',
-];
+/// Starter prompts drawn from the compound in front of you.
+///
+/// These used to be hardcoded around the demo compound, so someone running
+/// their own house was invited to ask where an F-250 they don't own is. Every
+/// suggestion here names something that actually exists, and the list shrinks
+/// to what's true rather than padding itself out.
+List<String> _suggestionsFor(Compound compound) {
+  final gate = compound.devices.whereType<LockDevice>().where((d) => d.isGate).firstOrNull;
+  final vehicle = compound.vehicles.firstOrNull;
+  return [
+    if (compound.devices.whereType<LightDevice>().isNotEmpty) 'Turn off all lights',
+    if (vehicle != null) 'Where is the ${vehicle.name}?',
+    if (gate != null) 'Open the ${gate.name}',
+    if (compound.mediaStats.movieCount > 0) 'What can I watch tonight?',
+    'Any alerts?',
+    "What's the state of the compound?",
+  ];
+}
 
 /// NEXUS AI tab (Section 5) - a streaming chat interface routed through the
 /// active [ProviderRegistry] provider (on-device / Mac Studio Ollama /
@@ -128,7 +140,13 @@ class _NexusAiTabState extends State<NexusAiTab> {
       color: NexusColors.background,
       child: Column(
         children: [
-          const TabHeader(title: 'NEXUS', pillLabel: 'Online', pillColor: NexusColors.green),
+          // Naming the backend beats a green "Online" pill that says nothing
+          // about which of four providers is actually answering.
+          TabHeader(
+            title: 'NEXUS',
+            pillLabel: AiScope.of(context).activeKind.label,
+            pillColor: NexusColors.purple,
+          ),
           Expanded(
             child: _messages.isEmpty
                 ? _Hero(onSuggestion: _send)
@@ -204,7 +222,7 @@ class _HeroState extends State<_Hero> with SingleTickerProviderStateMixin {
               spacing: 8,
               runSpacing: 8,
               children: [
-                for (final suggestion in _suggestions)
+                for (final suggestion in _suggestionsFor(CompoundScope.of(context).compound))
                   PressScale(
                     onTap: () => widget.onSuggestion(suggestion),
                     child: Container(
@@ -242,7 +260,16 @@ class _Bubble extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
           color: isUser ? NexusColors.blue : NexusColors.surface,
-          borderRadius: BorderRadius.circular(16),
+          // Tighter on the side the bubble is anchored to, the way every
+          // messaging app does it - it's what makes a bubble read as coming
+          // *from* somewhere.
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(18),
+            topRight: const Radius.circular(18),
+            bottomLeft: Radius.circular(isUser ? 18 : 5),
+            bottomRight: Radius.circular(isUser ? 5 : 18),
+          ),
+          boxShadow: NexusShadows.card,
         ),
         child: Text(
           message.text,
@@ -323,35 +350,74 @@ class _Composer extends StatelessWidget {
           color: NexusColors.surface,
           border: Border(top: BorderSide(color: NexusColors.separator, width: 0.6)),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                decoration: BoxDecoration(color: NexusColors.secondarySurface, borderRadius: BorderRadius.circular(20)),
-                child: EditableText(
-                  controller: controller,
-                  focusNode: focusNode,
-                  style: NexusText.body,
-                  cursorColor: NexusColors.blue,
-                  backgroundCursorColor: NexusColors.textFaint,
-                  maxLines: 4,
-                  minLines: 1,
-                  onSubmitted: onSend,
+        child: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, _) {
+            final hasText = value.text.trim().isNotEmpty;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: NexusColors.secondarySurface,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Stack(
+                      children: [
+                        // EditableText has no decoration of its own, so without
+                        // this the field is an unlabelled grey box.
+                        if (!hasText && value.text.isEmpty)
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Ask about your compound',
+                                  style: NexusText.body.copyWith(color: NexusColors.textFaint),
+                                ),
+                              ),
+                            ),
+                          ),
+                        EditableText(
+                          controller: controller,
+                          focusNode: focusNode,
+                          style: NexusText.body,
+                          cursorColor: NexusColors.blue,
+                          backgroundCursorColor: NexusColors.textFaint,
+                          maxLines: 4,
+                          minLines: 1,
+                          onSubmitted: onSend,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            PressScale(
-              onTap: () => onSend(controller.text),
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(color: NexusColors.blue, shape: BoxShape.circle),
-                child: const Center(child: NexusIcon(NexusGlyph.send, size: 15, color: Color(0xFFFFFFFF))),
-              ),
-            ),
-          ],
+                const SizedBox(width: 10),
+                // Dimmed with nothing typed, so the button reports whether
+                // pressing it will do anything.
+                AnimatedOpacity(
+                  opacity: hasText ? 1 : 0.35,
+                  duration: NexusDurations.fast,
+                  child: PressScale(
+                    onTap: hasText ? () => onSend(controller.text) : () {},
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: const BoxDecoration(
+                        color: NexusColors.blue,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Center(
+                        child: NexusIcon(NexusGlyph.send, size: 15, color: Color(0xFFFFFFFF)),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

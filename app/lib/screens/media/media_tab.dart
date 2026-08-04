@@ -72,13 +72,14 @@ class _MediaTabState extends State<MediaTab> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
-                    if (nowPlaying != null)
+                    if (nowPlaying != null) ...[
                       _NowPlayingCard(nowPlaying: nowPlaying, store: store, downloads: downloads),
-                    const SizedBox(height: 20),
+                      const SizedBox(height: 20),
+                    ],
                     _StatsRow(stats: compound.mediaStats),
                     if (downloaded.isNotEmpty) ...[
                       const SizedBox(height: 20),
-                      Text('Downloaded', style: NexusText.footnote),
+                      Text('Downloaded'.toUpperCase(), style: NexusText.sectionHeader),
                       const SizedBox(height: 10),
                       _PosterGrid(
                         children: [
@@ -101,13 +102,13 @@ class _MediaTabState extends State<MediaTab> {
                     ],
                     if (compound.photos.isNotEmpty) ...[
                       const SizedBox(height: 20),
-                      Text('Photos', style: NexusText.footnote),
+                      Text('Photos'.toUpperCase(), style: NexusText.sectionHeader),
                       const SizedBox(height: 10),
                       _PhotoGrid(photos: compound.photos, store: store),
                     ],
                     if (compound.music.isNotEmpty) ...[
                       const SizedBox(height: 20),
-                      Text('Music', style: NexusText.footnote),
+                      Text('Music'.toUpperCase(), style: NexusText.sectionHeader),
                       const SizedBox(height: 10),
                       _MusicList(
                         tracks: compound.music,
@@ -116,35 +117,38 @@ class _MediaTabState extends State<MediaTab> {
                       ),
                     ],
                     const SizedBox(height: 20),
-                    Text('Continue Watching', style: NexusText.footnote),
+                    Text('Continue watching'.toUpperCase(), style: NexusText.sectionHeader),
                     const SizedBox(height: 10),
-                    _PosterGrid(
-                      children: [
-                        for (final item in compound.continueWatching)
-                          _PosterTile(
-                            title: item.title,
-                            progress: item.progress,
-                            onTap: () => _playStreaming(item.id, store),
-                            trailing: downloads.isSupported
-                                ? _DownloadButton(
-                                    status: downloads.statusFor(item.id),
-                                    progress: downloads.progressFor(item.id),
-                                    onDownload: () {
-                                      final uri = store.mediaStreamUri(item.id);
-                                      if (uri != null) {
-                                        downloads.download(
-                                          item.id,
-                                          uri,
-                                          title: item.title,
-                                          durationSeconds: item.durationSeconds,
-                                        );
-                                      }
-                                    },
-                                  )
-                                : null,
-                          ),
-                      ],
-                    ),
+                    if (compound.continueWatching.isEmpty)
+                      _MediaEmptyState(stats: compound.mediaStats)
+                    else
+                      _PosterGrid(
+                        children: [
+                          for (final item in compound.continueWatching)
+                            _PosterTile(
+                              title: item.title,
+                              progress: item.progress,
+                              onTap: () => _playStreaming(item.id, store),
+                              trailing: downloads.isSupported
+                                  ? _DownloadButton(
+                                      status: downloads.statusFor(item.id),
+                                      progress: downloads.progressFor(item.id),
+                                      onDownload: () {
+                                        final uri = store.mediaStreamUri(item.id);
+                                        if (uri != null) {
+                                          downloads.download(
+                                            item.id,
+                                            uri,
+                                            title: item.title,
+                                            durationSeconds: item.durationSeconds,
+                                          );
+                                        }
+                                      },
+                                    )
+                                  : null,
+                            ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -152,6 +156,38 @@ class _MediaTabState extends State<MediaTab> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Shown where the Continue Watching grid would be. An empty grid renders as
+/// nothing at all under a heading, which reads as a broken screen rather than
+/// an empty library - and says nothing about how to fill it.
+class _MediaEmptyState extends StatelessWidget {
+  const _MediaEmptyState({required this.stats});
+
+  final MediaLibraryStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final noLibrary = stats.movieCount == 0 && stats.episodeCount == 0;
+    return NexusCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(noLibrary ? 'No library yet' : 'Nothing started', style: NexusText.bodyMedium),
+          const SizedBox(height: 6),
+          Text(
+            noLibrary
+                ? 'Point the server at a folder of movies, shows, photos and music '
+                    'under Settings → Server, then rescan. Everything it finds shows '
+                    'up here.'
+                : 'Start something and it waits for you here, at the position you '
+                    'left it, on every device.',
+            style: NexusText.subhead.copyWith(color: NexusColors.textMuted),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -645,7 +681,11 @@ class _MusicList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+      decoration: BoxDecoration(
+        color: NexusColors.surface,
+        borderRadius: BorderRadius.circular(NexusRadii.card),
+        boxShadow: NexusShadows.card,
+      ),
       child: Column(
         children: [
           for (var i = 0; i < tracks.length; i++) ...[
@@ -724,7 +764,11 @@ class _StatCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+      decoration: BoxDecoration(
+        color: NexusColors.surface,
+        borderRadius: BorderRadius.circular(NexusRadii.card),
+        boxShadow: NexusShadows.card,
+      ),
       child: Column(
         children: [
           Text('$value', style: NexusText.title),

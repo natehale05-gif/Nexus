@@ -285,6 +285,7 @@ class _Sheet extends StatelessWidget {
             decoration: BoxDecoration(
               color: NexusColors.surface,
               borderRadius: BorderRadius.circular(NexusRadii.card),
+              boxShadow: NexusShadows.raised,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,

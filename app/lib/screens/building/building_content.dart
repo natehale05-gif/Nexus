@@ -35,7 +35,12 @@ class BuildingContent extends StatelessWidget {
         if (locks.isNotEmpty) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+            decoration: BoxDecoration(
+              color: NexusColors.surface,
+              borderRadius: BorderRadius.circular(NexusRadii.card),
+              border: Border.all(color: NexusColors.cardBorder, width: 0.5),
+              boxShadow: NexusShadows.card,
+            ),
             child: Column(
               children: [
                 for (var i = 0; i < locks.length; i++) ...[

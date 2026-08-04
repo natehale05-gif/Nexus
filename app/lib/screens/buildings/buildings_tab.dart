@@ -351,13 +351,15 @@ class _BuildingsTabState extends State<BuildingsTab> {
 
     return [
       if (buildingLocks.isNotEmpty) ...[
-        Text('Locks & Gates', style: NexusText.footnote),
+        Text('Locks & gates'.toUpperCase(), style: NexusText.sectionHeader),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             color: NexusColors.surface,
             borderRadius: BorderRadius.circular(NexusRadii.card),
+            border: Border.all(color: NexusColors.cardBorder, width: 0.5),
+            boxShadow: NexusShadows.card,
           ),
           child: Column(
             children: [
@@ -378,7 +380,7 @@ class _BuildingsTabState extends State<BuildingsTab> {
           style: NexusText.subhead,
         )
       else ...[
-        Text('Rooms', style: NexusText.footnote),
+        Text('Rooms'.toUpperCase(), style: NexusText.sectionHeader),
         const SizedBox(height: 8),
         for (final room in rooms) ...[
           RoomWidget(

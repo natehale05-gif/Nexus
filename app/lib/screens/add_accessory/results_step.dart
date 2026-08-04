@@ -66,6 +66,8 @@ class ResultsStep extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: NexusColors.surface,
                         borderRadius: BorderRadius.circular(NexusRadii.card),
+                        border: Border.all(color: NexusColors.cardBorder, width: 0.5),
+                        boxShadow: NexusShadows.card,
                       ),
                       child: Row(
                         children: [
