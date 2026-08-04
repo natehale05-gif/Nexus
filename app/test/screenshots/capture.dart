@@ -90,6 +90,9 @@ void main() {
 
   const phone = Size(390, 844);
 
+  // Onboarding is deliberately not captured: it is the one screen with no
+  // interaction, and static text laid out on a test's first frame keeps the
+  // engine's box-glyph font no matter how many frames are pumped after it.
   testWidgets('home', (t) => shot(t, NexusTab.home, 'home', phone));
   testWidgets('buildings', (t) => shot(t, NexusTab.buildings, 'buildings', phone));
   testWidgets('security', (t) => shot(t, NexusTab.security, 'security', phone));
@@ -97,4 +100,16 @@ void main() {
   testWidgets('ai', (t) => shot(t, NexusTab.nexusAi, 'ai', phone));
   testWidgets('settings', (t) => shot(t, NexusTab.settings, 'settings', phone));
   testWidgets('wide', (t) => shot(t, NexusTab.settings, 'wide', const Size(1200, 820)));
+
+  // The setup flow that matters most: Settings → Server.
+  testWidgets('settings-server', (tester) async {
+    await shot(tester, NexusTab.settings, 'settings', phone);
+    await tester.tap(find.text('Server'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 600));
+    await expectLater(
+      find.byType(NexusApp),
+      matchesGoldenFile('goldens/settings_server.png'),
+    );
+  });
 }

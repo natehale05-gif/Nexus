@@ -248,6 +248,7 @@ class _SettingsTabState extends State<SettingsTab> {
             child: _SettingsField(
               controller: _hfQueryController,
               focusNode: _hfQueryFocus,
+              hint: 'Search Hugging Face',
               onChanged: (_) {},
             ),
           ),
@@ -688,6 +689,7 @@ class _SettingsTabState extends State<SettingsTab> {
             _SettingsField(
               controller: _addressController,
               focusNode: _addressFocusNode,
+              hint: '192.168.1.50:8765',
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 16),
@@ -697,6 +699,7 @@ class _SettingsTabState extends State<SettingsTab> {
               controller: _tokenController,
               focusNode: _tokenFocusNode,
               obscureText: true,
+              hint: 'From the server startup log',
               onChanged: (_) => setState(() {}),
             ),
             if (_error != null) ...[
@@ -792,6 +795,7 @@ class _SettingsTabState extends State<SettingsTab> {
               _SettingsField(
                 controller: _mediaRootController,
                 focusNode: _mediaRootFocus,
+                hint: '/home/you/Media',
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 4),
@@ -992,6 +996,7 @@ class _SettingsTabState extends State<SettingsTab> {
               controller: _ionTokenController,
               focusNode: _ionTokenFocus,
               obscureText: true,
+              hint: 'Paste your ion token',
               onChanged: (_) => setState(() => _ionSaved = false),
             ),
             const SizedBox(height: 4),
@@ -1058,6 +1063,7 @@ class _SettingsTabState extends State<SettingsTab> {
               _SettingsField(
                 controller: _aiUrlController,
                 focusNode: _aiUrlFocus,
+                hint: 'http://127.0.0.1:11434',
                 onChanged: (_) => setState(() {
                   _aiSaved = false;
                   // The detected list belongs to the old URL.
@@ -1114,6 +1120,7 @@ class _SettingsTabState extends State<SettingsTab> {
                 controller: _aiKeyController,
                 focusNode: _aiKeyFocus,
                 obscureText: true,
+                hint: 'Paste your API key',
                 onChanged: (_) => setState(() => _aiSaved = false),
               ),
             ],
@@ -1124,6 +1131,7 @@ class _SettingsTabState extends State<SettingsTab> {
               _SettingsField(
                 controller: _aiModelController,
                 focusNode: _aiModelFocus,
+                hint: 'llama3.1',
                 onChanged: (_) => setState(() => _aiSaved = false),
               ),
             ],
@@ -1173,6 +1181,7 @@ class _SettingsField extends StatelessWidget {
     required this.focusNode,
     required this.onChanged,
     this.obscureText = false,
+    this.hint,
   });
 
   final TextEditingController controller;
@@ -1180,19 +1189,42 @@ class _SettingsField extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final bool obscureText;
 
+  /// An example of what belongs here. EditableText draws no decoration of its
+  /// own, so without this every field is an anonymous grey box - which is
+  /// exactly the wrong thing on the screen where you type a server address.
+  final String? hint;
+
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(color: NexusColors.secondarySurface, borderRadius: BorderRadius.circular(12)),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: EditableText(
-        controller: controller,
-        focusNode: focusNode,
-        style: NexusText.body,
-        cursorColor: NexusColors.blue,
-        backgroundCursorColor: NexusColors.textFaint,
-        obscureText: obscureText,
-        onChanged: onChanged,
+      child: Stack(
+        children: [
+          if (hint != null)
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) => value.text.isEmpty
+                  ? IgnorePointer(
+                      child: Text(
+                        hint!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: NexusText.body.copyWith(color: NexusColors.textFaint),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          EditableText(
+            controller: controller,
+            focusNode: focusNode,
+            style: NexusText.body,
+            cursorColor: NexusColors.blue,
+            backgroundCursorColor: NexusColors.textFaint,
+            obscureText: obscureText,
+            onChanged: onChanged,
+          ),
+        ],
       ),
     );
   }

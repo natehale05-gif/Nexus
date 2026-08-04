@@ -48,21 +48,26 @@ class NexusButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final enabled = onTap != null;
-    final (background, foreground) = switch (style) {
-      NexusButtonStyle.primary => (NexusColors.blue, const Color(0xFFFFFFFF)),
-      NexusButtonStyle.tinted => (
-          NexusColors.blue.withValues(alpha: 0.12),
-          NexusColors.blue,
-        ),
-      NexusButtonStyle.plain => (NexusColors.secondarySurface, NexusColors.textPrimary),
-      NexusButtonStyle.destructive => (
-          NexusColors.red.withValues(alpha: 0.12),
-          NexusColors.red,
-        ),
-    };
+    // Disabled is its own colour rather than a faded version of the enabled
+    // one: a 40%-opacity blue button still reads as a blue button, just a
+    // paler one, so people tap it and nothing happens.
+    final (background, foreground) = !enabled
+        ? (NexusColors.secondarySurface, NexusColors.textFaint)
+        : switch (style) {
+            NexusButtonStyle.primary => (NexusColors.blue, const Color(0xFFFFFFFF)),
+            NexusButtonStyle.tinted => (
+                NexusColors.blue.withValues(alpha: 0.12),
+                NexusColors.blue,
+              ),
+            NexusButtonStyle.plain => (NexusColors.secondarySurface, NexusColors.textPrimary),
+            NexusButtonStyle.destructive => (
+                NexusColors.red.withValues(alpha: 0.12),
+                NexusColors.red,
+              ),
+          };
 
     return Opacity(
-      opacity: enabled ? 1 : 0.4,
+      opacity: enabled ? 1 : 0.85,
       child: PressScale(
         onTap: onTap ?? () {},
         child: Container(
