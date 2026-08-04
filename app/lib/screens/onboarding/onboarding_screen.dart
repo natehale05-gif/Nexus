@@ -32,7 +32,7 @@ class OnboardingScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text('NEXUS', style: NexusText.largeTitle),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(
                     'Set up how this device runs.',
                     style: NexusText.subhead.copyWith(color: NexusColors.textMuted),
@@ -107,10 +107,14 @@ class _Choice extends StatelessWidget {
         decoration: BoxDecoration(
           color: NexusColors.surface,
           borderRadius: BorderRadius.circular(NexusRadii.card),
+          // The recommended path gets a blue edge; the others keep the
+          // standard hairline so the difference reads as emphasis, not as
+          // two unrelated card styles.
           border: Border.all(
-            color: primary ? NexusColors.blue : const Color(0x00000000),
-            width: 1.4,
+            color: primary ? NexusColors.blue : NexusColors.cardBorder,
+            width: primary ? 1.5 : 0.5,
           ),
+          boxShadow: NexusShadows.card,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,7 +126,8 @@ class _Choice extends StatelessWidget {
             Text(
               action,
               style: NexusText.bodyMedium.copyWith(
-                color: primary ? NexusColors.blue : NexusColors.textPrimary,
+                fontWeight: FontWeight.w600,
+                color: primary ? NexusColors.blue : NexusColors.textSecondary,
               ),
             ),
           ],

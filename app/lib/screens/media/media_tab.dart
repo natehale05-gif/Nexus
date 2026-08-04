@@ -13,6 +13,7 @@ import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/press_scale.dart';
 import '../security/tab_header.dart';
+import '../../widgets/nexus_card.dart';
 
 /// Media tab (Section 5): Now Playing hero (real playback when connected to
 /// a server with a scanned library - see `server/lib/media/`), 3-stat row,
@@ -268,9 +269,7 @@ class _NowPlayingCardState extends State<_NowPlayingCard> {
     // 16:9 video surface.
     final isAudio = widget.store.compound.music.any((m) => m.id == nowPlaying.itemId);
     final controller = isAudio ? null : _controller;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+    return NexusCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

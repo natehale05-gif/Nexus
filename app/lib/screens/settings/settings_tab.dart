@@ -21,6 +21,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/press_scale.dart';
 import '../../widgets/status_pill.dart';
 import '../security/tab_header.dart';
+import '../../widgets/nexus_card.dart';
 
 /// Settings tab: where a device pairs with a `nexus_server` instance (or
 /// drops back to local-demo-mode). Replaces the old web-only `?server=`
@@ -528,12 +529,8 @@ class _SettingsTabState extends State<SettingsTab> {
           padding: const EdgeInsets.only(bottom: 10),
           child: PressScale(
             onTap: () => setState(() => _page = page),
-            child: Container(
+            child: NexusCard(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-              decoration: BoxDecoration(
-                color: NexusColors.surface,
-                borderRadius: BorderRadius.circular(NexusRadii.card),
-              ),
               child: Row(
                 children: [
                   Expanded(
@@ -546,7 +543,14 @@ class _SettingsTabState extends State<SettingsTab> {
                       ],
                     ),
                   ),
-                  Text('›', style: NexusText.headline.copyWith(color: NexusColors.textMuted)),
+                  const SizedBox(width: 12),
+                  Text(
+                    '›',
+                    style: NexusText.title.copyWith(
+                      color: NexusColors.textFaint,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -615,12 +619,7 @@ class _SettingsTabState extends State<SettingsTab> {
   }
 
   Widget _infoCard(String title, String body, {List<(String, String)> stats = const []}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: NexusColors.surface,
-        borderRadius: BorderRadius.circular(NexusRadii.card),
-      ),
+    return NexusCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -659,18 +658,13 @@ class _SettingsTabState extends State<SettingsTab> {
     return [
       Row(
         children: [
-          Text('Server', style: NexusText.footnote),
+          Text('Server'.toUpperCase(), style: NexusText.sectionHeader),
           const Spacer(),
           StatusPill(label: statusLabel, color: statusColor),
         ],
       ),
       const SizedBox(height: 10),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: NexusColors.surface,
-          borderRadius: BorderRadius.circular(NexusRadii.card),
-        ),
+      NexusCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -749,12 +743,7 @@ class _SettingsTabState extends State<SettingsTab> {
         const SizedBox(height: 20),
         Text('Media Library', style: NexusText.footnote),
         const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: NexusColors.surface,
-            borderRadius: BorderRadius.circular(NexusRadii.card),
-          ),
+        NexusCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -800,11 +789,9 @@ class _SettingsTabState extends State<SettingsTab> {
   List<Widget> _localServerSection(LocalServerController local, ConnectionScope scope) {
     if (!local.supported) return const [];
     return [
-      Text('Run a server here', style: NexusText.footnote),
+      Text('Run a server here'.toUpperCase(), style: NexusText.sectionHeader),
       const SizedBox(height: 10),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+      NexusCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -921,11 +908,9 @@ class _SettingsTabState extends State<SettingsTab> {
   List<Widget> _updateSection(UpdateController updates) {
     final update = updates.available;
     return [
-      Text('Version', style: NexusText.footnote),
+      Text('Version'.toUpperCase(), style: NexusText.sectionHeader),
       const SizedBox(height: 10),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+      NexusCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1003,11 +988,9 @@ class _SettingsTabState extends State<SettingsTab> {
       AppMode.demo: 'The example compound. Nothing here is real.',
     };
     return [
-      Text('Mode', style: NexusText.footnote),
+      Text('Mode'.toUpperCase(), style: NexusText.sectionHeader),
       const SizedBox(height: 10),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+      NexusCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1049,11 +1032,9 @@ class _SettingsTabState extends State<SettingsTab> {
   List<Widget> _mapSection() {
     if (!mapTokenConfigurable) return const [];
     return [
-      Text('Map', style: NexusText.footnote),
+      Text('Map'.toUpperCase(), style: NexusText.sectionHeader),
       const SizedBox(height: 10),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+      NexusCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1111,11 +1092,9 @@ class _SettingsTabState extends State<SettingsTab> {
     final needsCredential = _aiKind != AiProviderKind.local;
     final isKeyProvider = _aiKind == AiProviderKind.anthropic || _aiKind == AiProviderKind.openai;
     return [
-      Text('AI Model', style: NexusText.footnote),
+      Text('AI Model'.toUpperCase(), style: NexusText.sectionHeader),
       const SizedBox(height: 10),
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: NexusColors.surface, borderRadius: BorderRadius.circular(NexusRadii.card)),
+      NexusCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

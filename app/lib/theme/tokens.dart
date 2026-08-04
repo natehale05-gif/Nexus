@@ -33,8 +33,35 @@ class NexusColors {
   static const mapCyan = Color(0xFF6EE7F7);
   static const mapTeal = Color(0xFF5EEAD4);
 
-  static const separator = Color(0x33636366);
+  /// Hairline between rows. Light enough to read as a separator rather than
+  /// a drawn line - the old 0x33 grey looked like a border on every row.
+  static const separator = Color(0x1F3C3C43);
+
+  /// Hairline around raised surfaces, so cards keep an edge on white.
+  static const cardBorder = Color(0x14000000);
   static const overlayScrim = Color(0x66000000);
+}
+
+/// Elevation. Cards were flat fills, which is the main thing that made the
+/// app read as unfinished: with no shadow and no border, a white card on a
+/// near-white background has no edge at all.
+///
+/// Two levels only - resting content and things that float above it - because
+/// a longer ramp invites inconsistency without adding meaning.
+class NexusShadows {
+  NexusShadows._();
+
+  /// Resting cards, list rows, panels.
+  static const card = [
+    BoxShadow(color: Color(0x0A000000), blurRadius: 2, offset: Offset(0, 1)),
+    BoxShadow(color: Color(0x0F000000), blurRadius: 10, offset: Offset(0, 3)),
+  ];
+
+  /// Sheets, dialogs, anything overlapping content.
+  static const raised = [
+    BoxShadow(color: Color(0x14000000), blurRadius: 8, offset: Offset(0, 2)),
+    BoxShadow(color: Color(0x1F000000), blurRadius: 32, offset: Offset(0, 12)),
+  ];
 }
 
 class NexusRadii {

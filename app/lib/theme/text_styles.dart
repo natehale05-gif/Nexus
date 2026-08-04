@@ -73,6 +73,16 @@ class NexusText {
     letterSpacing: 0.4,
   );
 
+  /// Group label above a card, iOS-style: small, uppercase, tracked, muted.
+  /// Previously these were plain footnotes, so a section title looked
+  /// identical to the helper text underneath it.
+  static final sectionHeader = _base.copyWith(
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+    letterSpacing: 0.6,
+    color: NexusColors.textFaint,
+  );
+
   static final dialReadout = _base.copyWith(
     fontSize: 46,
     fontWeight: FontWeight.w700,

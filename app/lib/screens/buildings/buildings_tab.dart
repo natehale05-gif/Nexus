@@ -8,6 +8,7 @@ import '../../theme/tokens.dart';
 import '../../state/compound_store.dart';
 import '../../state/nexus_data_source.dart';
 import '../../widgets/edit_prompts.dart';
+import '../../widgets/nexus_button.dart';
 import 'discover_sheet.dart';
 import '../../widgets/press_scale.dart';
 import '../../widgets/status_pill.dart';
@@ -15,6 +16,7 @@ import '../building/building_status.dart';
 import '../building/device_rows/lock_row.dart';
 import '../building/room_widget.dart';
 import '../security/tab_header.dart';
+import '../../widgets/nexus_card.dart';
 
 /// Buildings tab: one tab per building on the compound, each showing that
 /// building's rooms as room-widget cards containing every device in the
@@ -454,8 +456,8 @@ class _BuildingsTabState extends State<BuildingsTab> {
 
 /// Horizontally scrolling building selector - one pill per building, with a
 /// status dot so problems are visible without switching tabs.
-/// A restrained pill button - the compound-editing affordances shouldn't
-/// compete visually with the device controls they sit beneath.
+/// Thin wrapper over [NexusButton] so the compound-editing affordances share
+/// the app's one button style rather than a second, nearly-identical one.
 class _AddButton extends StatelessWidget {
   const _AddButton({
     required this.label,
@@ -471,21 +473,12 @@ class _AddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? NexusColors.red : NexusColors.blue;
-    return PressScale(
+    return NexusButton(
+      label: label,
       onTap: onTap,
-      child: Container(
-        width: compact ? null : double.infinity,
-        padding: EdgeInsets.symmetric(horizontal: compact ? 14 : 16, vertical: compact ? 9 : 13),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(compact ? NexusRadii.pill : 14),
-        ),
-        child: Center(
-          widthFactor: compact ? 1 : null,
-          child: Text(label, style: NexusText.bodyMedium.copyWith(color: color)),
-        ),
-      ),
+      compact: compact,
+      expand: !compact,
+      style: destructive ? NexusButtonStyle.destructive : NexusButtonStyle.tinted,
     );
   }
 }
@@ -579,12 +572,7 @@ class _BuildingHeader extends StatelessWidget {
     final lightsOn = devices.whereType<LightDevice>().where((l) => l.on).length;
     final mesh = compound.meshNodeOfBuilding(building.id);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: NexusColors.surface,
-        borderRadius: BorderRadius.circular(NexusRadii.card),
-      ),
+    return NexusCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
