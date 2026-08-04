@@ -100,6 +100,16 @@ abstract class NexusDataSource extends ChangeNotifier {
 
   void addDevice(Device device);
 
+  /// Moves a building's pin to a normalized (0..1) spot on the map.
+  ///
+  /// On the interface rather than only on the local store because it has to
+  /// work against a server too - a compound the server owns is the case where
+  /// getting the layout right matters most, since every paired device sees it.
+  void moveBuilding(String buildingId, double mapX, double mapY);
+
+  /// Same, for a vehicle.
+  void moveVehicle(String vehicleId, double mapX, double mapY);
+
   List<Device> devicesMatchingName(String query);
   Building? buildingMatchingName(String query);
 }

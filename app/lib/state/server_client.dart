@@ -417,6 +417,14 @@ class ServerClient extends NexusDataSource {
   void addDevice(Device device) => _send('addDevice', {'device': device.toJson()});
 
   @override
+  void moveBuilding(String buildingId, double mapX, double mapY) =>
+      _send('moveBuilding', {'id': buildingId, 'mapX': mapX, 'mapY': mapY});
+
+  @override
+  void moveVehicle(String vehicleId, double mapX, double mapY) =>
+      _send('moveVehicle', {'id': vehicleId, 'mapX': mapX, 'mapY': mapY});
+
+  @override
   List<Device> devicesMatchingName(String query) {
     final q = query.toLowerCase();
     return compound.devices.where((d) => d.name.toLowerCase().contains(q)).toList();

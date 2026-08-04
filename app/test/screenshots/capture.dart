@@ -109,6 +109,15 @@ void main() {
   testWidgets('settings', (t) => shot(t, NexusTab.settings, 'settings', phone));
   testWidgets('wide', (t) => shot(t, NexusTab.settings, 'wide', const Size(1200, 820)));
 
+  // Arrange mode: the state where pins are drag handles.
+  testWidgets('arrange', (tester) async {
+    await shot(tester, NexusTab.home, 'home', phone);
+    await tester.tap(find.text('Arrange'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    await expectLater(find.byType(NexusApp), matchesGoldenFile('goldens/arrange.png'));
+  });
+
   // The QR itself, against a payload shaped like a real machine's. Worth its
   // own capture: a QR that encodes but paints blank looks fine in code and is
   // useless in the one moment it matters.

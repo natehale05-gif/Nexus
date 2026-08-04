@@ -21,10 +21,23 @@ import '../building/building_view.dart';
 /// and even on native a pin is a small target that says nothing about what's
 /// inside. This is the Apple Maps idiom, and it works identically everywhere.
 class BuildingDock extends StatelessWidget {
-  const BuildingDock({super.key, required this.bottomInset});
+  const BuildingDock({
+    super.key,
+    required this.bottomInset,
+    this.arranging = false,
+    this.canArrange = true,
+    this.onToggleArrange,
+  });
 
   /// Space to leave for the tab bar sitting underneath.
   final double bottomInset;
+
+  /// True while pins on the map are drag handles.
+  final bool arranging;
+
+  /// False where pins can't be dragged at all (the web map draws its own).
+  final bool canArrange;
+  final VoidCallback? onToggleArrange;
 
   @override
   Widget build(BuildContext context) {
@@ -51,14 +64,37 @@ class BuildingDock extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    compound.buildings.isEmpty
-                        ? 'No buildings yet'
-                        : '${compound.buildings.length} '
-                            'building${compound.buildings.length == 1 ? '' : 's'}',
-                    style: NexusText.sectionHeader.copyWith(
-                      color: const Color(0xB3FFFFFF),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          arranging
+                              ? 'Drag a pin to where it stands'
+                              : compound.buildings.isEmpty
+                                  ? 'No buildings yet'
+                                  : '${compound.buildings.length} '
+                                      'building${compound.buildings.length == 1 ? '' : 's'}',
+                          style: NexusText.sectionHeader.copyWith(
+                            color: arranging
+                                ? const Color(0xFF5AC8FA)
+                                : const Color(0xB3FFFFFF),
+                          ),
+                        ),
+                      ),
+                      if (canArrange &&
+                          onToggleArrange != null &&
+                          compound.buildings.isNotEmpty)
+                        PressScale(
+                          onTap: onToggleArrange!,
+                          child: Text(
+                            arranging ? 'Done' : 'Arrange',
+                            style: NexusText.bodyMedium.copyWith(
+                              color: const Color(0xFF5AC8FA),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   if (compound.buildings.isEmpty)

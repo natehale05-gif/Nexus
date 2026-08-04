@@ -182,6 +182,74 @@ void main() {
     store.dispose();
   });
 
+  group('moving things on the map', () {
+    test('dragging a building moves its zone and persists', () {
+      var saves = 0;
+      final store = emptyStore(onPersist: (_) => saves++);
+      store.addBuilding('Barn', mapX: 0.5, mapY: 0.5);
+      final before = saves;
+
+      store.moveBuilding('barn', 0.2, 0.8);
+
+      expect(store.compound.zones.single.mapX, 0.2);
+      expect(store.compound.zones.single.mapY, 0.8);
+      // Getting the layout right is worth nothing if it's gone next launch.
+      expect(saves, before + 1);
+      store.dispose();
+    });
+
+    test('a drag past the edge lands at the edge rather than being ignored', () {
+      final store = emptyStore();
+      store.addBuilding('Shed');
+      store.moveBuilding('shed', 3, -2);
+      // Clamped, not rejected: overshooting means "as far as it goes".
+      expect(store.compound.zones.single.mapX, 0.95);
+      expect(store.compound.zones.single.mapY, 0.05);
+      store.dispose();
+    });
+
+    test('moving one building does not drag the others with it', () {
+      final store = emptyStore();
+      store.addBuilding('A', mapX: 0.3, mapY: 0.3);
+      store.addBuilding('B', mapX: 0.7, mapY: 0.7);
+
+      store.moveBuilding('a', 0.1, 0.1);
+
+      final b = store.compound.zones.firstWhere((z) => z.buildingIds.contains('b'));
+      expect(b.mapX, 0.7);
+      expect(b.mapY, 0.7);
+      store.dispose();
+    });
+
+    test('an unknown id is a no-op, not a crash', () {
+      final store = emptyStore();
+      store.addBuilding('Barn', mapX: 0.4, mapY: 0.4);
+      store.moveBuilding('does_not_exist', 0.9, 0.9);
+      expect(store.compound.zones.single.mapX, 0.4);
+      store.dispose();
+    });
+
+    test('vehicles move the same way', () {
+      final store = emptyStore();
+      store.addVehicle('Truck', mapX: 0.5, mapY: 0.5);
+      store.moveVehicle('truck', 0.25, 0.75);
+      expect(store.compound.vehicles.single.mapX, 0.25);
+      expect(store.compound.vehicles.single.mapY, 0.75);
+      store.dispose();
+    });
+
+    test('a moved position survives a save and reload', () {
+      final store = emptyStore();
+      store.addBuilding('Cabin');
+      store.moveBuilding('cabin', 0.42, 0.61);
+
+      final restored = Compound.fromJson(store.compound.toJson());
+      expect(restored.zones.single.mapX, closeTo(0.42, 1e-9));
+      expect(restored.zones.single.mapY, closeTo(0.61, 1e-9));
+      store.dispose();
+    });
+  });
+
   test('a compound survives a JSON round trip', () {
     final store = emptyStore();
     store.addBuilding('Barn', mapX: 0.3, mapY: 0.7);

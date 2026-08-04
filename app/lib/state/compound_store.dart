@@ -84,13 +84,32 @@ class CompoundStore extends NexusDataSource {
         id: id,
         name: name,
         buildingIds: [id],
-        mapX: mapX.clamp(0.05, 0.95),
-        mapY: mapY.clamp(0.05, 0.95),
+        mapX: clampMapPosition(mapX),
+        mapY: clampMapPosition(mapY),
         primaryBuildingId: id,
       ));
     });
     return building;
   }
+
+  /// Drags a building to where it actually stands on the property.
+  ///
+  /// The zone is what carries the position, so this moves the zone the
+  /// building belongs to. A zone holding several buildings moves as one -
+  /// that's what grouping them meant.
+  @override
+  void moveBuilding(String buildingId, double mapX, double mapY) => _mutate(() {
+        for (final zone in compound.zones) {
+          if (zone.buildingIds.contains(buildingId)) zone.moveTo(mapX, mapY);
+        }
+      });
+
+  @override
+  void moveVehicle(String vehicleId, double mapX, double mapY) => _mutate(() {
+        for (final vehicle in compound.vehicles) {
+          if (vehicle.id == vehicleId) vehicle.moveTo(mapX, mapY);
+        }
+      });
 
   void renameBuilding(String id, String name) => _mutate(() {
         compound.buildings.firstWhere((b) => b.id == id).name = name;

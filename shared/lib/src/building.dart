@@ -1,3 +1,5 @@
+import 'map_position.dart';
+
 /// A room inside a [Building]. Devices reference rooms by id; rooms don't
 /// hold device objects directly so the compound's device list stays the
 /// single source of truth.
@@ -77,6 +79,17 @@ class Zone {
   /// Normalized (0.0-1.0) position on the map canvas.
   double mapX;
   double mapY;
+
+  /// Puts this zone somewhere, keeping it on the canvas.
+  ///
+  /// Clamped rather than rejected: a drag that ends past the edge means "as
+  /// far over as it goes", not "cancel the move". The inset keeps the pin's
+  /// own label from being half off-screen, which is what happens at a true
+  /// 0 or 1.
+  void moveTo(double x, double y) {
+    mapX = clampMapPosition(x);
+    mapY = clampMapPosition(y);
+  }
 
   /// Which building the long-press "jump straight to full-screen building
   /// view" gesture opens (Section 3). Defaults to the first building.

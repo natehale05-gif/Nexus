@@ -58,6 +58,59 @@ void main() {
       expect(light.on, isTrue);
     });
 
+    test('moveBuilding relocates the zone and broadcasts the new state', () {
+      final server = ServerCompound();
+      final integrations = IntegrationsManager(server);
+      final dispatcher = CommandDispatcher(server, integrations, _emptyLibrary());
+      final zone = server.compound.zones.first;
+      final buildingId = zone.buildingIds.first;
+
+      final result = dispatcher.dispatch(
+        'moveBuilding',
+        {'id': buildingId, 'mapX': 0.18, 'mapY': 0.77},
+      );
+
+      expect(zone.mapX, closeTo(0.18, 1e-9));
+      expect(zone.mapY, closeTo(0.77, 1e-9));
+      // Every paired device learns the new layout from this broadcast rather
+      // than having to ask for it.
+      final broadcast = Compound.fromJson(result['compound'] as Map<String, dynamic>);
+      expect(
+        broadcast.zones.firstWhere((z) => z.id == zone.id).mapX,
+        closeTo(0.18, 1e-9),
+      );
+    });
+
+    test('moveBuilding clamps an off-canvas drag instead of rejecting it', () {
+      final server = ServerCompound();
+      final integrations = IntegrationsManager(server);
+      final dispatcher = CommandDispatcher(server, integrations, _emptyLibrary());
+      final zone = server.compound.zones.first;
+
+      dispatcher.dispatch(
+        'moveBuilding',
+        {'id': zone.buildingIds.first, 'mapX': -5, 'mapY': 12},
+      );
+
+      expect(zone.mapX, 0.05);
+      expect(zone.mapY, 0.95);
+    });
+
+    test('moveVehicle moves only the vehicle named', () {
+      final server = ServerCompound();
+      final integrations = IntegrationsManager(server);
+      final dispatcher = CommandDispatcher(server, integrations, _emptyLibrary());
+      final vehicles = server.compound.vehicles;
+      final target = vehicles.first;
+      final other = vehicles.length > 1 ? vehicles[1] : null;
+      final otherX = other?.mapX;
+
+      dispatcher.dispatch('moveVehicle', {'id': target.id, 'mapX': 0.3, 'mapY': 0.6});
+
+      expect(target.mapX, closeTo(0.3, 1e-9));
+      if (other != null) expect(other.mapX, otherX);
+    });
+
     test('throws for an unknown command', () {
       final server = ServerCompound();
       final integrations = IntegrationsManager(server);

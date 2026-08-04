@@ -13,6 +13,8 @@ class ZonePin extends StatefulWidget {
     required this.selected,
     required this.onTap,
     required this.onLongPress,
+    this.arranging = false,
+    this.onDragged,
   });
 
   final Zone zone;
@@ -20,6 +22,14 @@ class ZonePin extends StatefulWidget {
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+
+  /// True while the map is in arrange mode: the pin grows a halo and follows
+  /// a drag instead of opening anything.
+  final bool arranging;
+
+  /// Called with the drag delta in pixels. Null when this pin can't be moved
+  /// (a compound the server owns and this device can't edit).
+  final ValueChanged<Offset>? onDragged;
 
   @override
   State<ZonePin> createState() => _ZonePinState();
@@ -63,10 +73,14 @@ class _ZonePinState extends State<ZonePin> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     final shouldPulse = widget.status.state == ZonePinState.alert && !widget.selected;
 
+    final canDrag = widget.arranging && widget.onDragged != null;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: widget.onTap,
-      onLongPress: widget.onLongPress,
+      // While arranging, a tap must not also open the zone sheet - the pin is
+      // a handle, not a button.
+      onTap: canDrag ? null : widget.onTap,
+      onLongPress: canDrag ? null : widget.onLongPress,
+      onPanUpdate: canDrag ? (details) => widget.onDragged!(details.delta) : null,
       child: SizedBox(
         width: NexusTapTargets.mapPin,
         height: NexusTapTargets.mapPin,
@@ -76,13 +90,18 @@ class _ZonePinState extends State<ZonePin> with SingleTickerProviderStateMixin {
             AnimatedBuilder(
               animation: _pulse,
               builder: (context, child) {
-                final pulseValue = shouldPulse ? _pulse.value : 0.0;
+                // Arrange mode gets its own steady halo so it's obvious which
+                // pins are draggable, without competing with the alert pulse.
+                final pulseValue =
+                    canDrag ? 0.55 : (shouldPulse ? _pulse.value : 0.0);
                 return Container(
                   width: _dotSize + pulseValue * 14,
                   height: _dotSize + pulseValue * 14,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _color.withValues(alpha: shouldPulse ? (0.35 * (1 - pulseValue)) : 0),
+                    color: canDrag
+                        ? const Color(0xFFFFFFFF).withValues(alpha: 0.28)
+                        : _color.withValues(alpha: shouldPulse ? (0.35 * (1 - pulseValue)) : 0),
                   ),
                 );
               },
@@ -94,7 +113,9 @@ class _ZonePinState extends State<ZonePin> with SingleTickerProviderStateMixin {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _color,
-                border: widget.selected ? Border.all(color: const Color(0xFFFFFFFF), width: 2.4) : null,
+                border: widget.selected || canDrag
+                    ? Border.all(color: const Color(0xFFFFFFFF), width: 2.4)
+                    : null,
                 boxShadow: widget.selected
                     ? [
                         BoxShadow(color: _color.withValues(alpha: 0.9), blurRadius: 6, spreadRadius: 0.5),

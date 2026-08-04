@@ -1,3 +1,5 @@
+import 'map_position.dart';
+
 import 'enums.dart';
 
 /// A vehicle pin on the Home map. Vehicles are separate from zones/buildings
@@ -20,6 +22,12 @@ class Vehicle {
   int batteryPercent;
   double mapX;
   double mapY;
+
+  /// Puts this vehicle somewhere on the map, clamped to the canvas.
+  void moveTo(double x, double y) {
+    mapX = clampMapPosition(x);
+    mapY = clampMapPosition(y);
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,

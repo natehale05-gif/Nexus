@@ -16,6 +16,7 @@ export 'src/endpoint.dart';
 export 'src/enums.dart';
 export 'src/insight.dart';
 export 'src/insights_engine.dart';
+export 'src/map_position.dart';
 export 'src/media.dart';
 export 'src/mesh_node.dart';
 export 'src/pairing.dart';

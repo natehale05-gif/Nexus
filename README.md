@@ -216,6 +216,23 @@ its next push.
 
 ## The compound map
 
+Buildings sit where you put them. **Home > Arrange** turns every pin into a
+drag handle - drag one to where it actually stands on the property, then
+**Done**. A mode rather than always-on dragging, because you tap pins
+constantly on a map and a stray finger that nudges the barn thirty feet north
+is a change nobody asked for and might not notice.
+
+Positions are normalized 0..1 and clamped to the canvas, so a drag that
+overshoots lands at the edge rather than being thrown away. Against a paired
+server the move goes through the same command surface as everything else, so
+every device sees the new layout immediately and it survives a restart.
+
+Only where NEXUS draws the pins, which is desktop and mobile. The web build's
+map is a JavaScript scene that draws and hit-tests its own markers, so the
+Arrange button hides itself there.
+
+
+
 The Home tab's map has two modes, and the default needs nothing from you.
 
 ### 2D satellite (default)

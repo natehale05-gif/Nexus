@@ -7,16 +7,28 @@ import '../../theme/tokens.dart';
 /// Vehicle pin on the Home map - separate from zones, no controls, just a
 /// status card overlay when tapped (Section 3).
 class VehiclePin extends StatelessWidget {
-  const VehiclePin({super.key, required this.vehicle, required this.onTap});
+  const VehiclePin({
+    super.key,
+    required this.vehicle,
+    required this.onTap,
+    this.arranging = false,
+    this.onDragged,
+  });
 
   final Vehicle vehicle;
   final VoidCallback onTap;
 
+  /// True while the map is in arrange mode - the pin becomes a drag handle.
+  final bool arranging;
+  final ValueChanged<Offset>? onDragged;
+
   @override
   Widget build(BuildContext context) {
+    final canDrag = arranging && onDragged != null;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTap: canDrag ? null : onTap,
+      onPanUpdate: canDrag ? (details) => onDragged!(details.delta) : null,
       child: SizedBox(
         width: NexusTapTargets.mapPin,
         height: NexusTapTargets.mapPin,
@@ -27,7 +39,12 @@ class VehiclePin extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: NexusColors.mapBaseDeep.withValues(alpha: 0.9),
-              border: Border.all(color: NexusColors.mapTeal.withValues(alpha: 0.6), width: 1.4),
+              border: Border.all(
+                color: canDrag
+                    ? const Color(0xFFFFFFFF)
+                    : NexusColors.mapTeal.withValues(alpha: 0.6),
+                width: canDrag ? 2.4 : 1.4,
+              ),
               boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 6, offset: Offset(0, 2))],
             ),
             child: Center(child: NexusIcon(NexusGlyph.vehicle, size: 16, color: NexusColors.mapTeal)),

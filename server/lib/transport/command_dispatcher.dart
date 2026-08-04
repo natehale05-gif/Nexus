@@ -57,6 +57,10 @@ class CommandDispatcher {
         server.turnOffAllLights();
       case 'setGrillCloudOnline':
         integrations.traeger.setCloudOnline(_id(args), _bool(args, 'value'));
+      case 'moveBuilding':
+        server.moveBuilding(_id(args), _num(args, 'mapX').toDouble(), _num(args, 'mapY').toDouble());
+      case 'moveVehicle':
+        server.moveVehicle(_id(args), _num(args, 'mapX').toDouble(), _num(args, 'mapY').toDouble());
       case 'addDevice':
         server.addDevice(Device.fromJson(args['device'] as Map<String, dynamic>));
       default:

@@ -33,6 +33,26 @@ class _HomeTabState extends State<HomeTab> {
   String? _activeVehicleId;
   final Set<String> _dismissedInsightIds = {};
 
+  /// While true the pins are drag handles rather than buttons.
+  ///
+  /// A mode rather than always-on dragging: on a map you tap pins constantly,
+  /// and a stray finger that nudges the barn thirty feet north is a change
+  /// nobody asked for and might not notice.
+  bool _arranging = false;
+
+  /// Turns a drag in pixels into a new normalized position and pushes it to
+  /// whichever store is live - the local compound or the server.
+  void _drag(
+    Offset delta,
+    Size canvas, {
+    required double x,
+    required double y,
+    required void Function(double, double) apply,
+  }) {
+    if (canvas.width <= 0 || canvas.height <= 0) return;
+    apply(x + delta.dx / canvas.width, y + delta.dy / canvas.height);
+  }
+
   void _openZoneSheet(BuildContext context, Zone zone) async {
     setState(() => _selectedZoneId = zone.id);
     await showNexusSheet(
@@ -97,6 +117,18 @@ class _HomeTabState extends State<HomeTab> {
                         selected: zone.id == _selectedZoneId,
                         onTap: () => _openZoneSheet(context, zone),
                         onLongPress: () => _openBuildingView(context, zone),
+                        arranging: _arranging,
+                        onDragged: (delta) => _drag(
+                          delta,
+                          size,
+                          x: zone.mapX,
+                          y: zone.mapY,
+                          apply: (x, y) => store.moveBuilding(
+                            zone.resolvedPrimaryBuildingId,
+                            x,
+                            y,
+                          ),
+                        ),
                       ),
                     ),
                 if (!useCesium)
@@ -107,6 +139,14 @@ class _HomeTabState extends State<HomeTab> {
                       child: VehiclePin(
                         vehicle: vehicle,
                         onTap: () => setState(() => _activeVehicleId = _activeVehicleId == vehicle.id ? null : vehicle.id),
+                        arranging: _arranging,
+                        onDragged: (delta) => _drag(
+                          delta,
+                          size,
+                          x: vehicle.mapX,
+                          y: vehicle.mapY,
+                          apply: (x, y) => store.moveVehicle(vehicle.id, x, y),
+                        ),
                       ),
                     ),
 
@@ -133,7 +173,15 @@ class _HomeTabState extends State<HomeTab> {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: BuildingDock(bottomInset: kNexusTabBarHeight),
+                  child: BuildingDock(
+                    bottomInset: kNexusTabBarHeight,
+                    arranging: _arranging,
+                    // Dragging pins is only possible where pins are Flutter
+                    // widgets. The web map is a JavaScript scene that draws
+                    // and hit-tests its own markers.
+                    canArrange: !useCesium,
+                    onToggleArrange: () => setState(() => _arranging = !_arranging),
+                  ),
                 ),
 
                 if (activeVehicle != null)

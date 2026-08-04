@@ -140,6 +140,20 @@ class ServerCompound {
         compound.devices.add(device);
       });
 
+  /// Moves the zone a building belongs to. A zone with several buildings
+  /// moves as one - grouping them is what said they're in the same place.
+  void moveBuilding(String buildingId, double mapX, double mapY) => mutate(() {
+        for (final zone in compound.zones) {
+          if (zone.buildingIds.contains(buildingId)) zone.moveTo(mapX, mapY);
+        }
+      });
+
+  void moveVehicle(String vehicleId, double mapX, double mapY) => mutate(() {
+        for (final vehicle in compound.vehicles) {
+          if (vehicle.id == vehicleId) vehicle.moveTo(mapX, mapY);
+        }
+      });
+
   void removeDevice(String id) => mutate(() {
         compound.devices.removeWhere((d) => d.id == id);
       });
