@@ -340,8 +340,21 @@ class _NowPlayingCardState extends State<_NowPlayingCard> {
                 Container(
                   width: 60,
                   height: 84,
-                  decoration: BoxDecoration(color: NexusColors.secondarySurface, borderRadius: BorderRadius.circular(10)),
-                  child: Center(child: NexusIcon(NexusGlyph.tv, size: 24, color: NexusColors.textFaint)),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF2A3150), NexusColors.mapBaseDeep],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: NexusIcon(
+                      NexusGlyph.tv,
+                      size: 24,
+                      color: const Color(0xFFFFFFFF).withValues(alpha: 0.22),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -608,8 +621,20 @@ class _PhotoThumb extends StatelessWidget {
     if (uri == null) {
       // Local-demo-mode: no server to fetch from.
       return Container(
-        color: NexusColors.secondarySurface,
-        child: Center(child: NexusIcon(NexusGlyph.tv, size: 18, color: NexusColors.textFaint)),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF2A3150), NexusColors.mapBaseDeep],
+          ),
+        ),
+        child: Center(
+          child: NexusIcon(
+            NexusGlyph.tv,
+            size: 18,
+            color: const Color(0xFFFFFFFF).withValues(alpha: 0.22),
+          ),
+        ),
       );
     }
     return Image.network(
@@ -818,10 +843,27 @@ class _PosterTile extends StatelessWidget {
             child: Container(
               width: double.infinity,
               clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(color: NexusColors.secondarySurface, borderRadius: BorderRadius.circular(10)),
+              // There is no artwork to show, so the tile has to carry itself.
+              // A flat grey rectangle with a small icon reads as a failed
+              // image load; a deliberate dark gradient reads as a poster.
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF2A3150), NexusColors.mapBaseDeep],
+                ),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: NexusShadows.card,
+              ),
               child: Stack(
                 children: [
-                  Center(child: NexusIcon(NexusGlyph.tv, size: 20, color: NexusColors.textFaint)),
+                  Center(
+                    child: NexusIcon(
+                      NexusGlyph.tv,
+                      size: 22,
+                      color: const Color(0xFFFFFFFF).withValues(alpha: 0.22),
+                    ),
+                  ),
                   if (trailing != null) Positioned(top: 6, right: 6, child: trailing!),
                   Positioned(
                     left: 0,
@@ -829,7 +871,7 @@ class _PosterTile extends StatelessWidget {
                     bottom: 0,
                     child: Container(
                       height: 3,
-                      color: const Color(0x22000000),
+                      color: const Color(0x33FFFFFF),
                       child: FractionallySizedBox(
                         alignment: Alignment.centerLeft,
                         widthFactor: progress,

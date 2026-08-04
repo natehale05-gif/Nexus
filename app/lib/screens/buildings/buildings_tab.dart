@@ -236,11 +236,21 @@ class _BuildingsTabState extends State<BuildingsTab> {
   Widget _wiringList(CompoundStore store, List<Device> devices) {
     if (devices.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
+      padding: const EdgeInsets.fromLTRB(2, 8, 2, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Unlabelled, the pills below read as decoration. They're the edit
+          // affordance, and the dot is the only place wiring state is shown.
+          Text(
+            'Wiring - tap to edit  ·  filled dot = wired to hardware',
+            style: NexusText.caption.copyWith(color: NexusColors.textFaint),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
           for (final device in devices)
             PressScale(
               onTap: () => _editDevice(store, device),
@@ -268,6 +278,8 @@ class _BuildingsTabState extends State<BuildingsTab> {
                 ),
               ),
             ),
+            ],
+          ),
         ],
       ),
     );
@@ -399,7 +411,9 @@ class _BuildingsTabState extends State<BuildingsTab> {
                     compact: true,
                     onTap: () => _addDevice(editor, building, room),
                   ),
-                  const SizedBox(width: 8),
+                  // Pushed to the far edge: a delete button sitting flush
+                  // against an add button is a mis-tap waiting to happen.
+                  const Spacer(),
                   _AddButton(
                     label: 'Delete room',
                     compact: true,
@@ -412,29 +426,45 @@ class _BuildingsTabState extends State<BuildingsTab> {
         ],
       ],
       if (editor != null) ...[
+        const SizedBox(height: 18),
+        Text('Add'.toUpperCase(), style: NexusText.sectionHeader),
         const SizedBox(height: 10),
-        _AddButton(label: 'Add a room', onTap: () => _addRoom(editor, building)),
-        const SizedBox(height: 10),
-        _AddButton(
-          label: 'Add a lock',
-          onTap: () => _addDevice(editor, building, null),
+        // A wrapped group rather than five stacked full-width buttons, which
+        // read as five unrelated primary actions and pushed everything else
+        // off the screen.
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _AddButton(
+              label: 'Room',
+              compact: true,
+              onTap: () => _addRoom(editor, building),
+            ),
+            _AddButton(
+              label: 'Lock',
+              compact: true,
+              onTap: () => _addDevice(editor, building, null),
+            ),
+            _AddButton(
+              label: 'Gate',
+              compact: true,
+              onTap: () => _addGate(editor, building),
+            ),
+            _AddButton(
+              label: 'Vehicle',
+              compact: true,
+              onTap: () => _addVehicle(editor),
+            ),
+          ],
         ),
-        const SizedBox(height: 10),
-        _AddButton(
-          label: 'Add a gate',
-          onTap: () => _addGate(editor, building),
-        ),
-        const SizedBox(height: 10),
-        _AddButton(
-          label: 'Add a vehicle',
-          onTap: () => _addVehicle(editor),
-        ),
-        const SizedBox(height: 10),
-        _AddButton(
+        const SizedBox(height: 12),
+        // The one that finds real hardware, so it gets the full-width slot.
+        NexusButton(
           label: 'Find devices on my network',
           onTap: () => _discover(editor, building, CompoundScope.of(context)),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 24),
         Row(
           children: [
             _AddButton(
@@ -442,7 +472,7 @@ class _BuildingsTabState extends State<BuildingsTab> {
               compact: true,
               onTap: () => _renameBuilding(editor, building),
             ),
-            const SizedBox(width: 8),
+            const Spacer(),
             _AddButton(
               label: 'Delete building',
               compact: true,
@@ -590,12 +620,14 @@ class _BuildingHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Row(
+          // Wrap, not Row: three stats plus fixed gaps overflow a phone-width
+          // card as soon as the counts reach two digits.
+          Wrap(
+            spacing: 18,
+            runSpacing: 8,
             children: [
               _Stat(icon: NexusGlyph.mapPinBase, label: '${rooms.length} room${rooms.length == 1 ? '' : 's'}'),
-              const SizedBox(width: 18),
               _Stat(icon: NexusGlyph.signal, label: '${devices.length} device${devices.length == 1 ? '' : 's'}'),
-              const SizedBox(width: 18),
               _Stat(icon: NexusGlyph.bulb, label: '$lightsOn on'),
             ],
           ),
