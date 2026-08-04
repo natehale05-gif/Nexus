@@ -17,6 +17,7 @@ export 'src/insight.dart';
 export 'src/insights_engine.dart';
 export 'src/media.dart';
 export 'src/mesh_node.dart';
+export 'src/pairing.dart';
 export 'src/simulation.dart';
 export 'src/vehicle.dart';
 export 'src/weather.dart';

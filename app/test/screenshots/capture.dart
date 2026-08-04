@@ -12,9 +12,13 @@ library;
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nexus_shared/nexus_shared.dart';
 import 'package:nexus_app/main.dart';
 import 'package:nexus_app/screens/nav_menu.dart';
+import 'package:nexus_app/theme/tokens.dart';
+import 'package:nexus_app/widgets/qr_view.dart';
 
 Future<void> _loadFonts() async {
   // flutter_tester lives at <sdk>/bin/cache/artifacts/engine/<host>/, so the
@@ -100,6 +104,48 @@ void main() {
   testWidgets('ai', (t) => shot(t, NexusTab.nexusAi, 'ai', phone));
   testWidgets('settings', (t) => shot(t, NexusTab.settings, 'settings', phone));
   testWidgets('wide', (t) => shot(t, NexusTab.settings, 'wide', const Size(1200, 820)));
+
+  // The QR itself, against a payload shaped like a real machine's. Worth its
+  // own capture: a QR that encodes but paints blank looks fine in code and is
+  // useless in the one moment it matters.
+  testWidgets('qr', (tester) async {
+    final payload = PairingPayload(
+      addresses: ['192.168.1.50:8765', '100.101.102.103:8765', 'shed.tail1234.ts.net:8765'],
+      token: '3f8a1c04b27e4d9fa6710c5382bd94ef',
+    );
+    await tester.binding.setSurfaceSize(const Size(280, 280));
+    tester.view.physicalSize = const Size(280, 280);
+    tester.view.devicePixelRatio = 1.0;
+    await tester.pumpWidget(
+      Container(
+        alignment: Alignment.center,
+        color: NexusColors.background,
+        child: QrView(data: payload.encodeWebLink('https://natehale05-gif.github.io/Nexus/')),
+      ),
+    );
+    await tester.pump();
+    await expectLater(find.byType(QrView), matchesGoldenFile('goldens/qr.png'));
+  });
+
+  // The pairing invite, rendered against a payload that looks like a real
+  // machine's - a LAN address plus a Tailscale one.
+  testWidgets('pairing', (tester) async {
+    await tester.binding.setSurfaceSize(phone);
+    tester.view.physicalSize = phone;
+    tester.view.devicePixelRatio = 1.0;
+    await tester.pumpWidget(const NexusApp());
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.text('Open demo'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(
+      find.descendant(of: find.byType(NexusTabBar), matching: find.text('Settings')),
+    );
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.text('Server'));
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 600));
+    await expectLater(find.byType(NexusApp), matchesGoldenFile('goldens/pairing.png'));
+  });
 
   // The setup flow that matters most: Settings → Server.
   testWidgets('settings-server', (tester) async {

@@ -265,8 +265,9 @@ Every desktop release bundles a native `nexus_server` next to the app
 executable. **Settings → Run a server here → Start server and pair this
 device** compiles down to: launch it, wait for `/health`, read the pairing
 token it generated, and connect this device to it automatically. Point it at
-your media folder in the same panel, and the token is shown so your phone and
-other machines can pair to the same server over the LAN or Tailscale.
+your media folder in the same panel, and a QR code appears so your phone and
+other machines can pair to the same server over the LAN or Tailscale - point a
+camera at it and that device is connected.
 
 Notes on how it behaves, since they're deliberate:
 
@@ -567,11 +568,33 @@ live against a real `nexus_server` instance via `ServerClient` - both
 implement the same `NexusDataSource` interface, so no screen code cares
 which one is active.
 
-**Settings tab (recommended, all platforms).** Open the section menu ->
-**Settings**, enter the server's address and the pairing token printed in
-its startup log, and tap **Connect**. This is persisted on-device (secure
-storage), so the app reconnects automatically on every future launch -
-no relaunching, no URL to retype. **Forget This Server** clears it and
+**Scan the QR code (recommended).** On the machine running the server,
+**Settings > Server** shows a QR code under *Add another device*. Point a
+phone's ordinary camera at it - not an in-app scanner, the built-in one - and
+it opens NEXUS already connected. Nothing to install first, nothing to type.
+
+The QR encodes an https link to the web app with the pairing in the URL
+*fragment*. Fragments are never sent to the server, so the pairing token
+never reaches GitHub Pages even though the page itself is public. The app
+stores the pairing and strips it back out of the address bar immediately, so
+it doesn't linger in history or bookmarks.
+
+**Paste the pairing code.** The same panel has **Copy code**, which yields a
+short `nexus://pair?a=...&t=...` string. Paste that into **Settings > Server**
+on any device that already has NEXUS installed and tap **Pair**. Use this on
+desktop, where scanning a QR with the machine itself isn't practical.
+
+Both forms carry *every* address the server answers on, not just one - see
+**One pairing, home and away** below. Any paired device can re-share the same
+pairing from its own Settings, so a second phone can be added without walking
+back to the server.
+
+**Enter an address manually.** Still there, under *Enter an address manually*,
+for a server NEXUS didn't start: address plus the pairing token from its
+startup log. It only ever records the single address you typed.
+
+All three are persisted on-device (secure storage), so the app reconnects
+automatically on every future launch. **Forget this server** clears it and
 drops back to local-demo-mode.
 
 **`?server=` query param (web, quick testing only).** Append
@@ -597,6 +620,35 @@ locally - the server is the single source of truth. This has been
 verified end-to-end: server-side REST mutations show up in the app
 instantly via the WebSocket push, and app-side taps show up in the
 server's state immediately, with no page reload either direction.
+
+## One pairing, home and away
+
+A single server address can only ever be right in one place. `192.168.1.50`
+works at home and is meaningless from an airport; a Tailscale address works
+everywhere but takes the long way round on your own LAN. So a pairing carries
+**all** of them.
+
+When a desktop app starts a server it enumerates what that machine is actually
+reachable on: every non-loopback IPv4, its Tailscale address if it has one
+(the `100.64.0.0/10` range), and its MagicDNS name if the `tailscale` CLI is
+installed - preferring the name, since the 100.x address can change. LAN
+addresses go first (fastest at home), remote last.
+
+`ServerClient` then rotates through that list. Each reconnect attempt moves to
+the next address and wraps around, and the exponential backoff only grows once
+a whole cycle has failed - so trying three addresses doesn't push the delay to
+8s before the first has had a fair chance. There's also a 6-second per-address
+deadline, because the interesting failure isn't a refused connection (instant)
+but a silent one: off the home network, packets to `192.168.1.50` are simply
+dropped, and without a deadline the app would sit on "Connecting..." forever
+on an address that will never answer.
+
+The upshot: pair once at home, walk out the door, and the app finds its way to
+the Tailscale address on its own. The pairing panel says which case you're in -
+green if the server has a remotely-reachable address, amber if it's home-only.
+
+Reaching it from a *browser* is the one case that still needs setup, because
+browsers block plain `ws://` from an `https://` page - see below.
 
 ## Remote access with Tailscale
 

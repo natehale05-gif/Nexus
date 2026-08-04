@@ -66,6 +66,10 @@ dependencies:
   # pulled in transitively; pinned here so the direct import is explicit.
   web: ^1.1.1
   pointer_interceptor: ^0.10.1+2
+  # Pure-Dart QR encoding for the pairing code (see widgets/qr_view.dart).
+  # No platform channels, so it works identically on desktop, mobile and web
+  # and can't break a desktop build.
+  qr: ^4.0.0
 
 dev_dependencies:
   flutter_test:

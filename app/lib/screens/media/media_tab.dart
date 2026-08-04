@@ -180,7 +180,7 @@ class _MediaEmptyState extends StatelessWidget {
           Text(
             noLibrary
                 ? 'Point the server at a folder of movies, shows, photos and music '
-                    'under Settings → Server, then rescan. Everything it finds shows '
+                    'under Settings > Server, then rescan. Everything it finds shows '
                     'up here.'
                 : 'Start something and it waits for you here, at the position you '
                     'left it, on every device.',

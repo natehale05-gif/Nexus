@@ -95,6 +95,58 @@ void main() {
     final reply = await client.sendChat('hello');
     expect(reply, 'fake reply');
   });
+
+  group('address failover', () {
+    test('falls through a dead address to a live one', () async {
+      // Port 1 is reserved and nothing listens there, which is what "the LAN
+      // address you paired on at home" looks like from a hotel.
+      final client = ServerClient(
+        hostOrUrl: '127.0.0.1:1',
+        token: 'test-token',
+        fallbacks: ['127.0.0.1:$port'],
+      );
+      addTearDown(client.dispose);
+
+      await _waitFor(() => client.isConnected, timeout: const Duration(seconds: 10));
+      expect(client.activeAddress, '127.0.0.1:$port');
+    });
+
+    test('a duplicate address does not cost an extra failed attempt', () async {
+      final client = ServerClient(
+        hostOrUrl: '127.0.0.1:$port',
+        token: 'test-token',
+        fallbacks: ['127.0.0.1:$port', '  ', '127.0.0.1:$port'],
+      );
+      addTearDown(client.dispose);
+      await _waitFor(() => client.isConnected);
+      expect(client.activeAddress, '127.0.0.1:$port');
+    });
+
+    test('reaching the server keeps working after failover, not just connecting',
+        () async {
+      final client = ServerClient(
+        hostOrUrl: '127.0.0.1:1',
+        token: 'test-token',
+        fallbacks: ['127.0.0.1:$port'],
+      );
+      addTearDown(client.dispose);
+      await _waitFor(() => client.isConnected, timeout: const Duration(seconds: 10));
+
+      // Media streams are built off the active address, so a stale one here
+      // would connect fine and then fail to play anything.
+      final stream = client.mediaStreamUri('some-item')!;
+      expect(stream.port, port + 1);
+
+      final light = client.compound.devices.whereType<LightDevice>().first;
+      final initial = light.on;
+      client.toggleLight(light.id);
+      await _waitFor(() {
+        final current =
+            client.compound.devices.whereType<LightDevice>().firstWhere((d) => d.id == light.id);
+        return current.on != initial;
+      });
+    });
+  });
 }
 
 Future<void> _waitFor(bool Function() predicate, {Duration timeout = const Duration(seconds: 5)}) async {

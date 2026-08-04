@@ -24,17 +24,41 @@ import 'nexus_data_source.dart';
 /// instead. Requires the server's pairing token (shown in its startup
 /// log) - see `server/lib/auth/pairing_token.dart`.
 class ServerClient extends NexusDataSource {
-  ServerClient({required String hostOrUrl, required this.token}) : uri = _normalize(hostOrUrl) {
+  ServerClient({
+    required String hostOrUrl,
+    required this.token,
+    List<String> fallbacks = const [],
+  }) : _candidates = _normalizeAll([hostOrUrl, ...fallbacks]) {
     _compound = buildDemoCompound();
     _connect();
   }
 
   final String token;
-  final Uri uri;
+
+  /// Every address this pairing knows about, in preference order.
+  ///
+  /// A single address can only be right in one place - the LAN IP you paired
+  /// on at home is useless in an airport, and the Tailscale address is slower
+  /// than it needs to be at home. So each reconnect attempt moves to the next
+  /// candidate and wraps around, which means changing networks costs a
+  /// reconnect rather than a trip to Settings.
+  final List<Uri> _candidates;
+  int _candidate = 0;
+
+  /// The address currently being used (or tried).
+  Uri get uri => _candidates[_candidate];
+
+  /// Exposed so the UI can say which of several addresses actually worked -
+  /// "connected over Tailscale" is meaningfully different from "connected on
+  /// the LAN" when you are trying to work out why something is slow.
+  String get activeAddress =>
+      uri.hasPort ? '${uri.host}:${uri.port}' : uri.host;
+
   late Compound _compound;
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
   Timer? _reconnectTimer;
+  Timer? _timeoutTimer;
   int _nextId = 0;
   int _reconnectAttempt = 0;
   bool _disposed = false;
@@ -85,6 +109,22 @@ class ServerClient extends NexusDataSource {
     return uri.hasPort ? uri : uri.replace(port: 8765);
   }
 
+  /// Normalizes every candidate and drops duplicates, keeping order. A
+  /// duplicate would cost a whole failed attempt and its backoff.
+  static List<Uri> _normalizeAll(List<String> raw) {
+    final seen = <String>{};
+    final out = <Uri>[];
+    for (final entry in raw) {
+      if (entry.trim().isEmpty) continue;
+      final uri = _normalize(entry);
+      if (seen.add(uri.toString())) out.add(uri);
+    }
+    // Never end up with an empty candidate list - the whole class indexes
+    // into it, and an empty one would be a crash rather than a failed
+    // connection.
+    return out.isEmpty ? [_normalize('127.0.0.1:8765')] : out;
+  }
+
   /// The REST API's base URL, derived from the WebSocket [uri] - the
   /// server always runs REST on the port right after the WebSocket one
   /// (8765/8766 by default, or whatever a `tailscale serve` setup fronts
@@ -107,24 +147,54 @@ class ServerClient extends NexusDataSource {
     );
   }
 
+  /// How long to give one address before moving to the next.
+  ///
+  /// A refused connection fails immediately, but the interesting case is the
+  /// silent one: off the home network, packets to `192.168.1.50` are simply
+  /// dropped, so the socket neither connects nor errors. Without a deadline
+  /// the app would sit on "Connecting…" forever on the first address in the
+  /// list and never try the one that works.
+  static const connectTimeout = Duration(seconds: 6);
+
+  /// Identifies the current connection attempt, so a late failure from an
+  /// abandoned one can't advance the candidate a second time and skip an
+  /// address.
+  int _generation = 0;
+
   void _connect() {
     _status = _everConnected ? ConnectionStatus.reconnecting : ConnectionStatus.connecting;
     notifyListeners();
+    final generation = ++_generation;
+    _timeoutTimer?.cancel();
+    _timeoutTimer = Timer(connectTimeout, () {
+      if (!isConnected) _handleDisconnect(generation);
+    });
     try {
       final channel = WebSocketChannel.connect(uri);
       _channel = channel;
-      channel.sink.add(jsonEncode({'type': 'auth', 'token': token}));
+      // The transport reports a refused or reset connection by rejecting
+      // `ready`; the stream stays silent, so failover has to hang off this.
+      // Handling it also keeps the rejection from escaping as an unhandled
+      // async error, which is routine during failover but fatal in a zone
+      // that treats unhandled errors as crashes.
+      channel.ready.then(
+        (_) => channel.sink.add(jsonEncode({'type': 'auth', 'token': token})),
+        onError: (_) => _handleDisconnect(generation),
+      );
       _subscription = channel.stream.listen(
         _onMessage,
-        onError: (_) => _handleDisconnect(),
-        onDone: _handleDisconnect,
+        onError: (_) => _handleDisconnect(generation),
+        onDone: () => _handleDisconnect(generation),
       );
     } catch (_) {
-      _handleDisconnect();
+      _handleDisconnect(generation);
     }
   }
 
-  void _handleDisconnect() {
+  void _handleDisconnect(int generation) {
+    // A straggler from a connection we already gave up on.
+    if (generation != _generation || _disposed) return;
+    _timeoutTimer?.cancel();
     if (isConnected) {
       isConnected = false;
       _status = ConnectionStatus.reconnecting;
@@ -135,7 +205,12 @@ class ServerClient extends NexusDataSource {
 
   void _scheduleReconnect() {
     if (_disposed) return;
-    final delaySeconds = min(30, pow(2, _reconnectAttempt).toInt());
+    // Move to the next address every attempt, and only back off once a whole
+    // cycle has failed - otherwise trying three addresses would take the
+    // backoff from 2s to 8s before the first one had a fair chance.
+    _candidate = (_candidate + 1) % _candidates.length;
+    final cycles = _reconnectAttempt ~/ _candidates.length;
+    final delaySeconds = min(30, pow(2, cycles).toInt());
     _reconnectAttempt++;
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
@@ -188,6 +263,7 @@ class ServerClient extends NexusDataSource {
   void dispose() {
     _disposed = true;
     _reconnectTimer?.cancel();
+    _timeoutTimer?.cancel();
     _subscription?.cancel();
     _channel?.sink.close();
     super.dispose();

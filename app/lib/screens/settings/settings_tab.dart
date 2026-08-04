@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/widgets.dart';
 
 import 'package:nexus_shared/nexus_shared.dart';
@@ -16,6 +17,7 @@ import '../../state/local_server_scope.dart';
 import '../../state/map_settings.dart';
 import '../../state/nexus_data_source.dart';
 import '../../state/update_scope.dart';
+import '../../state/web_app_url.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/press_scale.dart';
@@ -23,6 +25,7 @@ import '../../widgets/status_pill.dart';
 import '../security/tab_header.dart';
 import '../../widgets/nexus_button.dart';
 import '../../widgets/nexus_card.dart';
+import '../../widgets/qr_view.dart';
 
 /// Settings tab: where a device pairs with a `nexus_server` instance (or
 /// drops back to local-demo-mode). Replaces the old web-only `?server=`
@@ -47,6 +50,12 @@ class _SettingsTabState extends State<SettingsTab> {
   final _tokenController = TextEditingController();
   final _addressFocusNode = FocusNode();
   final _tokenFocusNode = FocusNode();
+
+  // Pairing by code - the path most people should take.
+  final _pairCodeController = TextEditingController();
+  final _pairCodeFocus = FocusNode();
+  String? _pairError;
+  bool _manualEntryOpen = false;
 
   // AI provider settings (see ai/).
   final _aiModelController = TextEditingController();
@@ -118,6 +127,8 @@ class _SettingsTabState extends State<SettingsTab> {
     _tokenController.dispose();
     _addressFocusNode.dispose();
     _tokenFocusNode.dispose();
+    _pairCodeController.dispose();
+    _pairCodeFocus.dispose();
     _aiModelController.dispose();
     _aiKeyController.dispose();
     _aiUrlController.dispose();
@@ -399,6 +410,47 @@ class _SettingsTabState extends State<SettingsTab> {
     }
   }
 
+  /// Pairs from a code copied off the machine running the server.
+  ///
+  /// The code carries every address that server answers on, so this device
+  /// ends up able to reach it both at home and from elsewhere - which is the
+  /// thing typing a single address into the manual form can never do.
+  Future<void> _pairFromCode() async {
+    final payload = PairingPayload.decode(_pairCodeController.text);
+    if (payload == null) {
+      setState(() => _pairError =
+          "That doesn't look like a pairing code. Copy it again from Settings > "
+          'Server on the computer running NEXUS.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _pairError = null;
+    });
+    try {
+      await ConnectionScope.of(context).onConnect(StoredConnection.fromPayload(payload));
+      if (!mounted) return;
+      // Keep the fields in step so the manual form shows what was paired.
+      _addressController.text = payload.addresses.first;
+      _tokenController.text = payload.token;
+      _pairCodeController.clear();
+    } catch (error) {
+      if (mounted) setState(() => _pairError = 'Could not save that pairing: $error');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _pastePairCode() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text;
+    if (text == null || text.trim().isEmpty || !mounted) return;
+    setState(() {
+      _pairCodeController.text = text.trim();
+      _pairError = null;
+    });
+  }
+
   Future<void> _forget() async {
     setState(() => _busy = true);
     try {
@@ -607,7 +659,7 @@ class _SettingsTabState extends State<SettingsTab> {
       _infoCard(
         'Library',
         'The server scans one folder for everything: movies, TV, photos and '
-            'music. Set it under Server → Run a server here, then rescan.',
+            'music. Set it under Server > Run a server here, then rescan.',
         stats: [
           ('Movies', '${compound.mediaStats.movieCount}'),
           ('Shows', '${compound.mediaStats.showCount}'),
@@ -672,15 +724,69 @@ class _SettingsTabState extends State<SettingsTab> {
         ],
       ),
       const SizedBox(height: 10),
+      // The pairing code is the path that should feel obvious, so it comes
+      // first and carries the whole flow: one paste, no address, no token,
+      // and every address the server knows about rather than the single one
+      // that happens to work where you're standing.
       NexusCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Enter the address of a nexus_server instance - a Tailscale name '
-              '(myhouse.tailnet-name.ts.net) for remote access, or a LAN address '
-              '(192.168.1.50:8765) at home - and the pairing token shown in its '
-              'startup log.',
+              'On the computer running NEXUS, open Settings > Server and either '
+              'scan the QR code with this device or copy the pairing code and '
+              'paste it here.',
+              style: NexusText.subhead,
+            ),
+            const SizedBox(height: 14),
+            _SettingsField(
+              controller: _pairCodeController,
+              focusNode: _pairCodeFocus,
+              hint: 'nexus://pair?…',
+              onChanged: (_) => setState(() => _pairError = null),
+            ),
+            if (_pairError != null) ...[
+              const SizedBox(height: 10),
+              Text(_pairError!, style: NexusText.footnote.copyWith(color: NexusColors.red)),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: NexusButton(
+                    label: _busy ? 'Connecting…' : 'Pair',
+                    onTap: _busy || _pairCodeController.text.trim().isEmpty
+                        ? null
+                        : _pairFromCode,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                NexusButton(
+                  label: 'Paste',
+                  style: NexusButtonStyle.plain,
+                  compact: true,
+                  expand: false,
+                  onTap: _pastePairCode,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 20),
+      // Kept, but demoted: it's the fallback for a server you run yourself
+      // somewhere NEXUS didn't start it, where there is no code to copy.
+      _ExpandingSection(
+        title: 'Enter an address manually',
+        expanded: _manualEntryOpen,
+        onToggle: () => setState(() => _manualEntryOpen = !_manualEntryOpen),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'A Tailscale name (myhouse.tailnet-name.ts.net) for remote access, '
+              'or a LAN address (192.168.1.50:8765) at home, plus the pairing '
+              'token from the server\'s startup log.',
               style: NexusText.subhead,
             ),
             const SizedBox(height: 16),
@@ -711,17 +817,21 @@ class _SettingsTabState extends State<SettingsTab> {
               label: _busy ? 'Connecting…' : 'Connect',
               onTap: _canConnect ? _connect : null,
             ),
-            if (connectionScope.current != null) ...[
-              const SizedBox(height: 10),
-              NexusButton(
-                label: 'Forget this server',
-                style: NexusButtonStyle.destructive,
-                onTap: _busy ? null : _forget,
-              ),
-            ],
           ],
         ),
       ),
+      if (connectionScope.current != null) ...[
+        const SizedBox(height: 20),
+        // Re-sharing from a paired device means you don't have to walk back to
+        // the machine running the server to add a third device.
+        _PairingInvite(payload: connectionScope.current!.payload),
+        const SizedBox(height: 20),
+        NexusButton(
+          label: 'Forget this server',
+          style: NexusButtonStyle.destructive,
+          onTap: _busy ? null : _forget,
+        ),
+      ],
       if (store.connectionStatus == ConnectionStatus.connected) ...[
         const SizedBox(height: 20),
         Text('Media Library', style: NexusText.footnote),
@@ -824,24 +934,16 @@ class _SettingsTabState extends State<SettingsTab> {
                     ? null
                     : (local.running ? local.stop : () => _startLocalServer(local, scope)),
               ),
-              if (local.running && local.handle != null) ...[
+              if (local.running && local.handle?.pairing != null) ...[
+                const SizedBox(height: 18),
+                _PairingInvite(payload: local.handle!.pairing!),
+              ] else if (local.running) ...[
                 const SizedBox(height: 12),
-                Text('Pairing token for your other devices', style: NexusText.footnote),
-                const SizedBox(height: 4),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: NexusColors.secondarySurface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(local.handle!.token, style: NexusText.body),
-                ),
-                const SizedBox(height: 6),
                 Text(
-                  'On another device, enter this computer\'s address and that token '
-                  'in Settings -> Server.',
-                  style: NexusText.footnote,
+                  'Running, but this machine reported no network address, so '
+                  'other devices have nothing to connect to. Check that it is '
+                  'on a network.',
+                  style: NexusText.footnote.copyWith(color: NexusColors.red),
                 ),
               ],
             ],
@@ -1148,6 +1250,163 @@ class _SettingsTabState extends State<SettingsTab> {
 }
 
 /// A pill for picking the active AI provider.
+/// A collapsed card that opens on tap.
+///
+/// For the paths that have to exist but shouldn't be the first thing anyone
+/// reads - manual address entry now that a pairing code does the same job in
+/// one paste.
+class _ExpandingSection extends StatelessWidget {
+  const _ExpandingSection({
+    required this.title,
+    required this.expanded,
+    required this.onToggle,
+    required this.child,
+  });
+
+  final String title;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return NexusCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PressScale(
+            onTap: onToggle,
+            child: Row(
+              children: [
+                Expanded(child: Text(title, style: NexusText.bodyMedium)),
+                Text(
+                  expanded ? '⌄' : '›',
+                  style: NexusText.title.copyWith(
+                    color: NexusColors.textFaint,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (expanded) ...[
+            const SizedBox(height: 14),
+            child,
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Everything another device needs, as one thing to point a camera at.
+///
+/// The QR encodes an ordinary https link to the NEXUS web app with the
+/// pairing in its fragment. That means a phone's *built-in* camera opens it -
+/// no app to install first, nothing to launch, and no in-app scanner to get
+/// the permissions wrong on. The same pairing pasted into an installed app
+/// works identically, which is what the text code underneath is for.
+class _PairingInvite extends StatefulWidget {
+  const _PairingInvite({required this.payload});
+
+  final PairingPayload payload;
+
+  @override
+  State<_PairingInvite> createState() => _PairingInviteState();
+}
+
+class _PairingInviteState extends State<_PairingInvite> {
+  bool _copied = false;
+  bool _showCode = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final payload = widget.payload;
+    final remote = payload.remoteAddresses;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Add another device'.toUpperCase(), style: NexusText.sectionHeader),
+        const SizedBox(height: 8),
+        Text(
+          'Point a phone camera at this. It opens NEXUS already connected - '
+          'nothing to type, nothing to install first.',
+          style: NexusText.subhead.copyWith(color: NexusColors.textMuted),
+        ),
+        const SizedBox(height: 14),
+        Center(child: QrView(data: payload.encodeWebLink(nexusWebAppUrl))),
+        const SizedBox(height: 14),
+        // Whether this pairing survives leaving the house is the single most
+        // useful thing to know here, and it is invisible otherwise.
+        Row(
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: remote.isEmpty ? NexusColors.amber : NexusColors.green,
+              ),
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Text(
+                remote.isEmpty
+                    ? 'Home network only. Install Tailscale on this machine to '
+                        'reach it while travelling.'
+                    : 'Works away from home too, over ${remote.first.split(':').first}.',
+                style: NexusText.footnote,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            NexusButton(
+              label: _copied ? 'Copied' : 'Copy code',
+              style: NexusButtonStyle.tinted,
+              compact: true,
+              expand: false,
+              onTap: () async {
+                await Clipboard.setData(ClipboardData(text: payload.encode()));
+                if (mounted) setState(() => _copied = true);
+              },
+            ),
+            const SizedBox(width: 8),
+            NexusButton(
+              label: _showCode ? 'Hide code' : 'Show code',
+              style: NexusButtonStyle.plain,
+              compact: true,
+              expand: false,
+              onTap: () => setState(() => _showCode = !_showCode),
+            ),
+          ],
+        ),
+        if (_showCode) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: NexusColors.secondarySurface,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(payload.encode(), style: NexusText.footnote),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Paste this into Settings > Server on any device that already has '
+            'NEXUS installed. Treat it like a password: it grants full control '
+            'of the compound.',
+            style: NexusText.footnote,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _AiProviderChip extends StatelessWidget {
   const _AiProviderChip({required this.label, required this.selected, required this.onTap});
 

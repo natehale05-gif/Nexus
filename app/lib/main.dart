@@ -12,6 +12,7 @@ import 'state/connection_scope.dart';
 import 'state/connection_settings.dart';
 import 'state/download_manager.dart';
 import 'state/download_scope.dart';
+import 'state/launch_pairing.dart';
 import 'state/local_server_scope.dart';
 import 'state/nexus_data_source.dart';
 import 'state/update_scope.dart';
@@ -84,8 +85,16 @@ class _NexusAppState extends State<NexusApp> {
   @override
   void initState() {
     super.initState();
-    _restoreMode();
-    _loadPersistedConnection();
+    // A pairing in the launch URL wins over everything: it means someone just
+    // scanned a QR code, and the whole point is that it takes effect without
+    // any further steps.
+    final scanned = pairingFromLaunchUrl();
+    if (scanned != null) {
+      _pairFromLink(scanned);
+    } else {
+      _restoreMode();
+      _loadPersistedConnection();
+    }
     // Load any previously-downloaded titles (native only; a no-op on web).
     _downloads.load();
     // Load this device's preferred AI provider/model + keys.
@@ -141,6 +150,14 @@ class _NexusAppState extends State<NexusApp> {
     setState(() => _mode = mode);
   }
 
+  /// Stores and applies a pairing that arrived by QR code, then takes it out
+  /// of the address bar so the token isn't left sitting there.
+  Future<void> _pairFromLink(PairingPayload payload) async {
+    setState(() => _modeResolved = true);
+    await _connect(StoredConnection.fromPayload(payload));
+    clearLaunchPairing();
+  }
+
   Future<void> _loadPersistedConnection() async {
     // The `?server=` override above always wins over a persisted setting.
     if (_store is ServerClient) return;
@@ -155,7 +172,11 @@ class _NexusAppState extends State<NexusApp> {
     }
     if (stored != null && mounted) {
       _switchTo(
-        ServerClient(hostOrUrl: stored.serverAddress, token: stored.token),
+        ServerClient(
+          hostOrUrl: stored.serverAddress,
+          token: stored.token,
+          fallbacks: stored.alternates,
+        ),
         current: stored,
       );
     }
@@ -175,7 +196,11 @@ class _NexusAppState extends State<NexusApp> {
     await _modeSettings.save(AppMode.server);
     if (mounted) setState(() => _mode = AppMode.server);
     _switchTo(
-      ServerClient(hostOrUrl: connection.serverAddress, token: connection.token),
+      ServerClient(
+        hostOrUrl: connection.serverAddress,
+        token: connection.token,
+        fallbacks: connection.alternates,
+      ),
       current: connection,
     );
   }

@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:nexus_shared/nexus_shared.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Desktop only. iOS/Android can't spawn a long-lived server process, and
@@ -33,12 +34,94 @@ String? get localServerPath {
 
 /// A running local server: where to point the app, and the token to pair with.
 class LocalServerHandle {
-  const LocalServerHandle({required this.address, required this.token});
+  const LocalServerHandle({
+    required this.address,
+    required this.token,
+    this.addresses = const [],
+  });
 
   /// `host:port` of the WebSocket port, in the shape the Settings screen and
-  /// [ServerClient] already expect.
+  /// [ServerClient] already expect. Loopback - this is how the machine
+  /// running the server talks to it.
   final String address;
   final String token;
+
+  /// Every address *other* devices can reach this server on, LAN first and
+  /// remote (Tailscale) last. Loopback is deliberately not in here: it is the
+  /// one address that is guaranteed wrong on a phone.
+  final List<String> addresses;
+
+  /// What to put in a QR code. Null until the server is up and its addresses
+  /// have been enumerated.
+  PairingPayload? get pairing =>
+      addresses.isEmpty ? null : PairingPayload(addresses: addresses, token: token);
+}
+
+/// Every address a *different* device could use to reach a server on this
+/// machine, in the order worth trying.
+///
+/// LAN addresses first: on the same network they're the fastest path and
+/// need nothing else running. Tailscale last, because it's the one that
+/// still works from somewhere else entirely - which is exactly the case
+/// where you want a fallback rather than a first choice.
+Future<List<String>> serverAddresses({int port = 8765}) async {
+  final lan = <String>[];
+  final remote = <String>[];
+  try {
+    final interfaces = await NetworkInterface.list(
+      type: InternetAddressType.IPv4,
+      includeLoopback: false,
+      includeLinkLocal: false,
+    );
+    for (final interface in interfaces) {
+      for (final address in interface.addresses) {
+        if (address.isLoopback) continue;
+        final entry = '${address.address}:$port';
+        (isTailscaleAddress(address.address) ? remote : lan).add(entry);
+      }
+    }
+  } catch (_) {
+    // Sandboxed or permission-denied interface enumeration: better to hand
+    // back whatever we have than to fail starting a server over it.
+  }
+
+  // The MagicDNS name outlives the 100.x address, so prefer it when the
+  // tailscale CLI is around to tell us what it is.
+  final magicDns = await _magicDnsName();
+  if (magicDns != null) remote.insert(0, '$magicDns:$port');
+
+  return [...lan, ...remote];
+}
+
+/// Asks the local tailscale CLI for this machine's MagicDNS name.
+///
+/// Best-effort and quick to give up: Tailscale is optional, the CLI isn't on
+/// PATH in every install (macOS puts it inside the .app), and a server start
+/// must never hang waiting for it.
+Future<String?> _magicDnsName() async {
+  const candidates = [
+    'tailscale',
+    '/usr/bin/tailscale',
+    '/usr/local/bin/tailscale',
+    '/Applications/Tailscale.app/Contents/MacOS/Tailscale',
+    r'C:\Program Files\Tailscale\tailscale.exe',
+  ];
+  for (final executable in candidates) {
+    try {
+      final result = await Process.run(executable, ['status', '--json'])
+          .timeout(const Duration(seconds: 3));
+      if (result.exitCode != 0) continue;
+      final decoded = jsonDecode(result.stdout as String) as Map<String, dynamic>;
+      final self = decoded['Self'] as Map<String, dynamic>?;
+      final dnsName = self?['DNSName'] as String?;
+      if (dnsName == null || dnsName.isEmpty) continue;
+      // Tailscale reports it fully-qualified, with a trailing dot.
+      return dnsName.endsWith('.') ? dnsName.substring(0, dnsName.length - 1) : dnsName;
+    } catch (_) {
+      continue;
+    }
+  }
+  return null;
 }
 
 /// Starts the bundled server and waits for it to become reachable.
@@ -154,6 +237,7 @@ Future<LocalServerHandle> _handleFromDisk() async {
   return LocalServerHandle(
     address: '127.0.0.1:8765',
     token: (await tokenFile.readAsString()).trim(),
+    addresses: await serverAddresses(),
   );
 }
 
