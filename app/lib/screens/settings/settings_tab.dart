@@ -21,6 +21,7 @@ import '../../theme/tokens.dart';
 import '../../widgets/press_scale.dart';
 import '../../widgets/status_pill.dart';
 import '../security/tab_header.dart';
+import '../../widgets/nexus_button.dart';
 import '../../widgets/nexus_card.dart';
 
 /// Settings tab: where a device pairs with a `nexus_server` instance (or
@@ -251,19 +252,12 @@ class _SettingsTabState extends State<SettingsTab> {
             ),
           ),
           const SizedBox(width: 8),
-          PressScale(
-            onTap: _hfSearching ? () {} : _searchHuggingFace,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: NexusColors.blue.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                _hfSearching ? '…' : 'Search',
-                style: NexusText.bodyMedium.copyWith(color: NexusColors.blue),
-              ),
-            ),
+          NexusButton(
+            label: _hfSearching ? 'Searching…' : 'Search',
+            style: NexusButtonStyle.tinted,
+            compact: true,
+            expand: false,
+            onTap: _hfSearching ? null : _searchHuggingFace,
           ),
         ],
       ),
@@ -310,32 +304,54 @@ class _SettingsTabState extends State<SettingsTab> {
           for (final model in results.take(8))
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: PressScale(
-                onTap: _pullingModel != null ? () {} : () => _pullModel(model),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: NexusColors.secondarySurface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(model.name, style: NexusText.bodyMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        [
-                          model.owner,
-                          if (model.parameterHint != null) model.parameterHint!,
-                          // Stating the RAM up front beats finding out by
-                          // watching a 40 GB download fail to load.
-                          if (estimatedRamGb(model.parameterHint) != null)
-                            '~${estimatedRamGb(model.parameterHint)!.toStringAsFixed(0)} GB RAM',
-                          '${model.downloads} downloads',
-                        ].join(' · '),
-                        style: NexusText.footnote,
-                      ),
-                    ],
+              // Everything dims while a pull is running, so it's obvious the
+              // list is not accepting a second download rather than just
+              // ignoring the tap.
+              child: Opacity(
+                opacity: _pullingModel == null ? 1 : 0.4,
+                child: PressScale(
+                  onTap: _pullingModel != null ? () {} : () => _pullModel(model),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: NexusColors.secondarySurface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(model.name, style: NexusText.bodyMedium),
+                              const SizedBox(height: 2),
+                              Text(
+                                [
+                                  model.owner,
+                                  if (model.parameterHint != null) model.parameterHint!,
+                                  // Stating the RAM up front beats finding out
+                                  // by watching a 40 GB download fail to load.
+                                  if (estimatedRamGb(model.parameterHint) != null)
+                                    '~${estimatedRamGb(model.parameterHint)!.toStringAsFixed(0)} GB RAM',
+                                  '${model.downloads} downloads',
+                                ].join(' · '),
+                                style: NexusText.footnote,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Rows that look like plain list items don't read as
+                        // "this starts a multi-gigabyte download".
+                        Text(
+                          'Download',
+                          style: NexusText.footnote.copyWith(
+                            color: NexusColors.blue,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -601,19 +617,10 @@ class _SettingsTabState extends State<SettingsTab> {
         ],
       ),
       const SizedBox(height: 12),
-      PressScale(
+      NexusButton(
+        label: 'Rescan library',
+        style: NexusButtonStyle.tinted,
         onTap: store.rescanLibrary,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 15),
-          decoration: BoxDecoration(
-            color: NexusColors.blue.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Center(
-            child: Text('Rescan library', style: NexusText.bodyMedium.copyWith(color: NexusColors.blue)),
-          ),
-        ),
       ),
     ];
   }
@@ -697,43 +704,16 @@ class _SettingsTabState extends State<SettingsTab> {
               Text(_error!, style: NexusText.footnote.copyWith(color: NexusColors.red)),
             ],
             const SizedBox(height: 20),
-            PressScale(
+            NexusButton(
+              label: _busy ? 'Connecting…' : 'Connect',
               onTap: _canConnect ? _connect : null,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                decoration: BoxDecoration(
-                  color: _canConnect ? NexusColors.blue : NexusColors.secondarySurface,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Center(
-                  child: Text(
-                    _busy ? 'Connecting…' : 'Connect',
-                    style: NexusText.headline.copyWith(
-                      color: _canConnect ? const Color(0xFFFFFFFF) : NexusColors.textFaint,
-                    ),
-                  ),
-                ),
-              ),
             ),
             if (connectionScope.current != null) ...[
               const SizedBox(height: 10),
-              PressScale(
+              NexusButton(
+                label: 'Forget this server',
+                style: NexusButtonStyle.destructive,
                 onTap: _busy ? null : _forget,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  decoration: BoxDecoration(
-                    color: NexusColors.secondarySurface,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Forget This Server',
-                      style: NexusText.headline.copyWith(color: NexusColors.red),
-                    ),
-                  ),
-                ),
               ),
             ],
           ],
@@ -759,22 +739,10 @@ class _SettingsTabState extends State<SettingsTab> {
                 style: NexusText.footnote,
               ),
               const SizedBox(height: 16),
-              PressScale(
+              NexusButton(
+                label: 'Rescan library',
+                style: NexusButtonStyle.tinted,
                 onTap: store.rescanLibrary,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  decoration: BoxDecoration(
-                    color: NexusColors.secondarySurface,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Rescan Library',
-                      style: NexusText.headline.copyWith(color: NexusColors.blue),
-                    ),
-                  ),
-                ),
               ),
             ],
           ),
@@ -837,32 +805,20 @@ class _SettingsTabState extends State<SettingsTab> {
                 Text(local.error!, style: NexusText.footnote.copyWith(color: NexusColors.red)),
               ],
               const SizedBox(height: 16),
-              PressScale(
+              NexusButton(
+                label: local.busy
+                    ? 'Working…'
+                    : local.running
+                        ? 'Stop server'
+                        : 'Start server and pair this device',
+                // Stopping is the destructive half of the pair, and it should
+                // never be the button your thumb lands on by habit.
+                style: local.running
+                    ? NexusButtonStyle.destructive
+                    : NexusButtonStyle.primary,
                 onTap: local.busy
-                    ? () {}
-                    : (local.running
-                        ? local.stop
-                        : () => _startLocalServer(local, scope)),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  decoration: BoxDecoration(
-                    color: local.running ? NexusColors.secondarySurface : NexusColors.blue,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Text(
-                      local.busy
-                          ? 'Working…'
-                          : local.running
-                              ? 'Stop server'
-                              : 'Start server and pair this device',
-                      style: NexusText.headline.copyWith(
-                        color: local.running ? NexusColors.textPrimary : const Color(0xFFFFFFFF),
-                      ),
-                    ),
-                  ),
-                ),
+                    ? null
+                    : (local.running ? local.stop : () => _startLocalServer(local, scope)),
               ),
               if (local.running && local.handle != null) ...[
                 const SizedBox(height: 12),
@@ -932,32 +888,17 @@ class _SettingsTabState extends State<SettingsTab> {
             ],
             const SizedBox(height: 14),
             if (update != null && update.assetUrl != null && updates.canSelfInstall)
-              PressScale(
-                onTap: updates.installing ? () {} : updates.install,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  decoration: BoxDecoration(color: NexusColors.blue, borderRadius: BorderRadius.circular(14)),
-                  child: Center(
-                    child: Text(
-                      updates.installing ? 'Downloading…' : 'Download and install ${update.version}',
-                      style: NexusText.headline.copyWith(color: const Color(0xFFFFFFFF)),
-                    ),
-                  ),
-                ),
+              NexusButton(
+                label: updates.installing
+                    ? 'Downloading…'
+                    : 'Download and install ${update.version}',
+                onTap: updates.installing ? null : updates.install,
               )
             else
-              PressScale(
-                onTap: updates.checking ? () {} : updates.check,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  decoration: BoxDecoration(
-                    color: NexusColors.secondarySurface,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(child: Text('Check for updates', style: NexusText.bodyMedium)),
-                ),
+              NexusButton(
+                label: updates.checking ? 'Checking…' : 'Check for updates',
+                style: NexusButtonStyle.plain,
+                onTap: updates.checking ? null : updates.check,
               ),
             if (update != null && update.assetUrl == null) ...[
               const SizedBox(height: 8),
@@ -1062,19 +1003,9 @@ class _SettingsTabState extends State<SettingsTab> {
               style: NexusText.footnote,
             ),
             const SizedBox(height: 20),
-            PressScale(
+            NexusButton(
+              label: _ionSaved ? 'Saved — reload to apply' : 'Save token',
               onTap: _saveIonToken,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                decoration: BoxDecoration(color: NexusColors.blue, borderRadius: BorderRadius.circular(14)),
-                child: Center(
-                  child: Text(
-                    _ionSaved ? 'Saved — reload to apply' : 'Save token',
-                    style: NexusText.headline.copyWith(color: const Color(0xFFFFFFFF)),
-                  ),
-                ),
-              ),
             ),
           ],
         ),
@@ -1140,22 +1071,10 @@ class _SettingsTabState extends State<SettingsTab> {
                 style: NexusText.footnote,
               ),
               const SizedBox(height: 12),
-              PressScale(
-                onTap: _probingOllama ? () {} : _probeOllama,
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  decoration: BoxDecoration(
-                    color: NexusColors.secondarySurface,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(
-                    child: Text(
-                      _probingOllama ? 'Checking…' : 'Detect installed models',
-                      style: NexusText.bodyMedium,
-                    ),
-                  ),
-                ),
+              NexusButton(
+                label: _probingOllama ? 'Checking…' : 'Detect installed models',
+                style: NexusButtonStyle.plain,
+                onTap: _probingOllama ? null : _probeOllama,
               ),
               ..._huggingFaceSection(),
               if (_ollamaModels != null) ...[
@@ -1209,19 +1128,9 @@ class _SettingsTabState extends State<SettingsTab> {
               ),
             ],
             const SizedBox(height: 20),
-            PressScale(
+            NexusButton(
+              label: _aiSaved ? 'Saved' : 'Save AI settings',
               onTap: () => _saveAi(registry),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                decoration: BoxDecoration(color: NexusColors.blue, borderRadius: BorderRadius.circular(14)),
-                child: Center(
-                  child: Text(
-                    _aiSaved ? 'Saved' : 'Save AI Settings',
-                    style: NexusText.headline.copyWith(color: const Color(0xFFFFFFFF)),
-                  ),
-                ),
-              ),
             ),
           ],
         ),

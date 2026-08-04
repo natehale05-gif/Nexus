@@ -7,7 +7,9 @@ import '../../state/compound_scope.dart';
 import '../../state/server_client.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/nexus_sheet.dart';
+import '../../widgets/press_scale.dart';
 import '../building/building_view.dart';
+import '../../theme/text_styles.dart';
 import '../nav_menu.dart';
 import 'cesium_map.dart';
 import 'crit_insight_pill.dart';
@@ -124,18 +126,23 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                 ),
 
-                // Section menu (top-right).
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: SafeArea(
-                    bottom: false,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 16, top: 12),
-                      child: const NexusMenuButton(onDark: true),
+                // A brand-new compound draws an empty map, which looks broken
+                // rather than empty. Say what it is and where to go next.
+                if (compound.zones.isEmpty && compound.vehicles.isEmpty)
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    bottom: kNexusTabBarHeight + 28,
+                    child: PointerInterceptor(
+                      child: _MapNotice(
+                        title: 'Nothing on the map yet',
+                        body: 'Add a building in Buildings and it appears here, '
+                            'positioned on your compound.',
+                        onTap: () => NexusNavScope.of(context).onSelect(NexusTab.buildings),
+                        action: 'Open Buildings',
+                      ),
                     ),
                   ),
-                ),
 
                 if (activeVehicle != null)
                   Positioned(
@@ -210,6 +217,64 @@ class _MapChip extends StatelessWidget {
             ],
           ),
           child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// A frosted card over the map, for when there is nothing on it to look at.
+class _MapNotice extends StatelessWidget {
+  const _MapNotice({
+    required this.title,
+    required this.body,
+    required this.action,
+    required this.onTap,
+  });
+
+  final String title;
+  final String body;
+  final String action;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const white = Color(0xFFFFFFFF);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(NexusRadii.card),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+          decoration: BoxDecoration(
+            color: const Color(0x59101528),
+            borderRadius: BorderRadius.circular(NexusRadii.card),
+            border: Border.all(color: const Color(0x33FFFFFF), width: 0.8),
+            boxShadow: NexusShadows.raised,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title, style: NexusText.headline.copyWith(color: white)),
+              const SizedBox(height: 6),
+              Text(
+                body,
+                style: NexusText.subhead.copyWith(color: white.withValues(alpha: 0.78)),
+              ),
+              const SizedBox(height: 12),
+              PressScale(
+                onTap: onTap,
+                child: Text(
+                  action,
+                  style: NexusText.bodyMedium.copyWith(
+                    color: const Color(0xFF5AC8FA),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

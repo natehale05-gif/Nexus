@@ -2,11 +2,12 @@ import 'package:flutter/widgets.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
 import '../../widgets/status_pill.dart';
-import '../nav_menu.dart';
 
-/// Conventional header (large title + optional status pill + the section
-/// menu) above scrollable content - used by Security, Media, and NEXUS AI.
-/// Home has no header; it floats the same menu over the map instead.
+/// Conventional header (large title + optional status pill) above scrollable
+/// content - used by Buildings, Security, Media, NEXUS AI and Settings.
+///
+/// Navigation used to live here as a pop-up menu; it's a permanent tab bar
+/// now, so the header is free to be just a title.
 class TabHeader extends StatelessWidget {
   const TabHeader({super.key, required this.title, this.pillLabel, this.pillColor});
 
@@ -19,15 +20,12 @@ class TabHeader extends StatelessWidget {
     return SafeArea(
       bottom: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 16, 10),
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
         child: Row(
           children: [
             Expanded(child: Text(title, style: NexusText.largeTitle)),
-            if (pillLabel != null) ...[
+            if (pillLabel != null)
               StatusPill(label: pillLabel!, color: pillColor ?? NexusColors.blue),
-              const SizedBox(width: 10),
-            ],
-            const NexusMenuButton(),
           ],
         ),
       ),

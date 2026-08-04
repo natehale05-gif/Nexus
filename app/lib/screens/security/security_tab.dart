@@ -5,9 +5,12 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:nexus_shared/nexus_shared.dart';
 import '../../icons/nexus_icons.dart';
+import '../../state/app_mode.dart';
 import '../../state/compound_scope.dart';
+import '../../state/connection_scope.dart';
 import '../../theme/text_styles.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/nexus_card.dart';
 import '../../widgets/press_scale.dart';
 import '../../widgets/status_pill.dart';
 import 'camera.dart';
@@ -41,9 +44,14 @@ class _SecurityTabState extends State<SecurityTab> {
       builder: (context, _) {
         final alerts = store.compound.alerts.where((a) => a.level != Level.info).toList()
           ..sort((a, b) => b.time.compareTo(a.time));
-        // Whatever the paired server declares via NEXUS_CAMERAS; the demo
-        // list only stands in when running with no server.
-        final cameras = store.compound.cameras.isNotEmpty ? store.compound.cameras : demoCameras;
+        // Whatever the paired server declares via NEXUS_CAMERAS. The demo
+        // list stands in only in demo mode - showing invented cameras to
+        // someone running their own compound is worse than showing none,
+        // because it looks like hardware they don't have is online.
+        final demo = ConnectionScope.of(context).mode == AppMode.demo;
+        final cameras = store.compound.cameras.isNotEmpty
+            ? store.compound.cameras
+            : (demo ? demoCameras : const <Camera>[]);
 
         return Container(
           color: NexusColors.background,
@@ -59,31 +67,49 @@ class _SecurityTabState extends State<SecurityTab> {
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
                     if (alerts.isNotEmpty) ...[
-                      Text('Active Alerts', style: NexusText.footnote),
+                      Text('Active alerts'.toUpperCase(), style: NexusText.sectionHeader),
                       const SizedBox(height: 10),
                       for (final alert in alerts) _AlertCard(alert: alert),
                       const SizedBox(height: 20),
                     ],
-                    Text('Cameras', style: NexusText.footnote),
+                    Text('Cameras'.toUpperCase(), style: NexusText.sectionHeader),
                     const SizedBox(height: 10),
-                    GridView.count(
-                      crossAxisCount: 2,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 1.25,
-                      children: [
-                        for (final camera in cameras)
-                          _CameraTile(
-                            camera: camera,
-                            expanded: _expandedCamera == camera.id,
-                            onTap: () => setState(
-                              () => _expandedCamera = _expandedCamera == camera.id ? null : camera.id,
+                    if (cameras.isEmpty)
+                      NexusCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('No cameras yet', style: NexusText.bodyMedium),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Cameras come from the server. Set NEXUS_CAMERAS on it to a '
+                              'comma-separated list of name=HLS-URL entries, then reconnect - '
+                              'each one shows up here with a live tile.',
+                              style: NexusText.subhead.copyWith(color: NexusColors.textMuted),
                             ),
-                          ),
-                      ],
-                    ),
+                          ],
+                        ),
+                      )
+                    else
+                      GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 1.25,
+                        children: [
+                          for (final camera in cameras)
+                            _CameraTile(
+                              camera: camera,
+                              expanded: _expandedCamera == camera.id,
+                              onTap: () => setState(
+                                () => _expandedCamera =
+                                    _expandedCamera == camera.id ? null : camera.id,
+                              ),
+                            ),
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -109,6 +135,7 @@ class _AlertCard extends StatelessWidget {
         color: NexusColors.surface,
         borderRadius: BorderRadius.circular(NexusRadii.card),
         border: Border(left: BorderSide(color: color, width: 4)),
+        boxShadow: NexusShadows.card,
       ),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Row(
@@ -202,6 +229,7 @@ class _CameraTileState extends State<_CameraTile> {
         decoration: BoxDecoration(
           color: NexusColors.mapBaseDeep,
           borderRadius: BorderRadius.circular(NexusRadii.card),
+          boxShadow: NexusShadows.card,
         ),
         child: Stack(
           fit: StackFit.expand,
