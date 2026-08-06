@@ -14,6 +14,7 @@ import 'state/download_manager.dart';
 import 'state/download_scope.dart';
 import 'state/launch_pairing.dart';
 import 'state/local_ai_scope.dart';
+import 'state/native_pairing.dart';
 import 'state/local_server_scope.dart';
 import 'state/nexus_data_source.dart';
 import 'state/update_scope.dart';
@@ -43,6 +44,7 @@ class _NexusAppState extends State<NexusApp> {
   final _downloads = DownloadManager();
   final _updates = UpdateController();
   final _localServer = LocalServerController();
+  final _nativePairing = const NativePairing();
   late final _localAi = LocalAiController(registry: _ai);
   late NexusDataSource _store = _createInitialDataSource();
   StoredConnection? _current;
@@ -195,6 +197,8 @@ class _NexusAppState extends State<NexusApp> {
 
   Future<void> _connect(StoredConnection connection) async {
     await _settings.save(connection);
+    // Siri reads this copy; it runs with the app closed, so it can't ask.
+    await _nativePairing.save(connection);
     await _modeSettings.save(AppMode.server);
     if (mounted) setState(() => _mode = AppMode.server);
     _switchTo(
@@ -209,6 +213,7 @@ class _NexusAppState extends State<NexusApp> {
 
   Future<void> _forget() async {
     await _settings.clear();
+    await _nativePairing.clear();
     await _modeSettings.clear();
     _switchTo(_localStore(await loadCompound()), current: null);
     if (mounted) setState(() => _mode = null);

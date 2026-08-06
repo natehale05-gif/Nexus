@@ -6,6 +6,8 @@ import 'package:shelf_router/shelf_router.dart';
 
 import '../auth/pairing_token.dart';
 import '../files/drive_store.dart';
+import '../intents/siri_runner.dart';
+import '../intents/siri_surface.dart';
 import '../integrations/ollama_bridge.dart';
 import '../media/library_index.dart';
 import '../discovery/discovery_service.dart';
@@ -133,6 +135,43 @@ class RestApi {
             'content-range': 'bytes $start-$end/$length',
             'content-length': '${end - start + 1}',
           });
+    });
+
+    // ---- Siri -------------------------------------------------------------
+    // Apple's App Intents call these directly rather than going through the
+    // app, so a spoken command works with NEXUS closed. Deliberately narrow:
+    // see intents/siri_surface.dart for why the assistant is not reachable
+    // from here.
+    router.get('/intents/catalog', (Request request) {
+      return Response.ok(
+        jsonEncode({
+          'actions': [
+            for (final action in siriActions)
+              {
+                'name': action.name,
+                'summary': action.summary,
+                'needsTarget': action.needsTarget,
+              },
+          ],
+          'targets': [for (final t in siriTargets(server.compound)) t.toJson()],
+        }),
+        headers: _json,
+      );
+    });
+
+    router.post('/intents/run', (Request request) async {
+      final body = await request.readAsString();
+      final args = body.isEmpty
+          ? <String, dynamic>{}
+          : (jsonDecode(body) as Map).cast<String, dynamic>();
+      final result = runSiriIntent(
+        dispatcher,
+        server.compound,
+        action: args['action'] as String? ?? '',
+        phrase: args['phrase'] as String? ?? '',
+        value: args['value'] as num?,
+      );
+      return Response.ok(jsonEncode(result.toJson()), headers: _json);
     });
 
     // ---- Drive: personal files -------------------------------------------

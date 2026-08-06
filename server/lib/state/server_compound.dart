@@ -68,6 +68,17 @@ class ServerCompound {
         _push(light, (e) => buildPowerRequest(e, light.on));
       });
 
+  /// Sets a light to a definite state.
+  ///
+  /// Toggling is fine for a button you can see the result of, and wrong for
+  /// anything spoken: "turn off the barn light" must turn it off, not invert
+  /// whatever it happens to be, and voice has no way to check first.
+  void setLightOn(String id, bool on) => mutate(() {
+        final light = _device<LightDevice>(id);
+        light.on = on;
+        _push(light, (e) => buildPowerRequest(e, on));
+      });
+
   void setBrightness(String id, num value) => mutate(() {
         final light = _device<LightDevice>(id);
         light.brightness = value.round().clamp(0, 100);

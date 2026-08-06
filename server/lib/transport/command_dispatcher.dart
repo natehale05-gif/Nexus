@@ -23,6 +23,8 @@ class CommandDispatcher {
     switch (command) {
       case 'toggleLight':
         server.toggleLight(_id(args));
+      case 'setLightOn':
+        server.setLightOn(_id(args), _bool(args, 'value'));
       case 'setBrightness':
         server.setBrightness(_id(args), _num(args, 'value'));
       case 'setClimateMode':

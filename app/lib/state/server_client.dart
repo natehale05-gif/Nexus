@@ -94,6 +94,10 @@ class ServerClient extends NexusDataSource {
     return !host.contains('.');
   }
 
+  /// Public so the Siri bridge can build the same REST base URL rather than
+  /// reimplementing the scheme and port rules in Swift.
+  static Uri normalizeAddress(String hostOrUrl) => _normalize(hostOrUrl);
+
   static Uri _normalize(String hostOrUrl) {
     var value = hostOrUrl.trim();
     if (!value.contains('://')) {

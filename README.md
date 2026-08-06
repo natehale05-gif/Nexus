@@ -531,6 +531,51 @@ silently missing.
 The Home map remains the spatial view (where things are); Buildings is the
 working view (operating a building room by room).
 
+## Siri
+
+Siri gets the compound - the lights, locks, gates, thermostats, the media
+devices, and the status of any of it. Say "turn off the barn lights", "close
+the driveway gate", "how's the compound".
+
+**It does not get NEXUS's own assistant.** Pointing one assistant at another
+is a game of telephone where neither is accountable for the answer, and where
+a spoken sentence could arrive as an arbitrary prompt. The exclusion is
+structural rather than a rule someone has to remember: `siriActions` in
+`server/lib/intents/siri_surface.dart` is an allow-list, everything spoken
+goes through it, and a test asserts chat is absent from the catalogue - so
+adding it later fails the suite instead of quietly working.
+
+Also absent, deliberately: anything that changes the compound's *shape*.
+Adding or moving buildings and devices are look-at-the-screen actions, and a
+misheard word should never rearrange the property.
+
+**The intents talk to the server directly, not through the app.** Siri runs
+them with NEXUS closed, from a HomePod, or off the lock screen; a spoken
+command that first waits for an app and a Flutter engine to launch is one
+that feels broken. So the Swift side POSTs to `/intents/run` on the compound
+server, trying each paired address in turn - the same failover the app does,
+so it works at home and away.
+
+To make that possible the app mirrors the pairing into the Keychain whenever
+it changes (`app/lib/state/native_pairing.dart` → `NexusPairingChannel` in
+each platform's `AppDelegate.swift`). Dart sends finished REST base URLs
+rather than host:port pairs, because working out the scheme and the +1 port
+is real logic that already exists in `ServerClient` and a second copy in
+Swift would drift.
+
+Two details that matter for how it sounds:
+
+- **Spoken commands are definite, never toggles.** "Turn off the barn light"
+  has to turn it off, not invert whatever it happens to be - voice can't
+  check first. That's why `setLightOn` exists alongside `toggleLight`.
+- **The noun in the phrase picks the kind.** "Main Thermostat" and "Barn Main
+  Floor" share one word, which was enough to have a question about a
+  thermostat switch off a light in another building. A phrase that names a
+  kind now filters to it, and a genuinely ambiguous phrase makes Siri ask
+  rather than guess.
+
+Requires iOS 16 / macOS 13 for App Intents.
+
 ## Multi-provider AI (NEXUS tab)
 
 ### Local AI, without setting anything up
