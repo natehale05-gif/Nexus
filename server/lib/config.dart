@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:nexus_shared/nexus_shared.dart';
 
+import 'sync/sync_source.dart';
+
 /// Server configuration, overridable via environment variables so a real
 /// deployment (e.g. a launchd/systemd service) isn't stuck with the
 /// hardcoded bind address/ports/data location. All are optional - the
@@ -15,6 +17,7 @@ class ServerConfig {
     required this.mediaRoot,
     required this.driveRoot,
     required this.cameras,
+    required this.syncSources,
   });
 
   factory ServerConfig.fromEnvironment() {
@@ -30,6 +33,15 @@ class ServerConfig {
       // yours to arrange, the other is the server's to index.
       driveRoot: env['NEXUS_DRIVE_ROOT'] ?? '$dataDir/drive',
       cameras: parseCameras(env['NEXUS_CAMERAS']),
+      // Explicit sources win; otherwise use whichever of Apple's standard
+      // folders actually exist on this machine, so a Mac with iCloud on
+      // needs no configuration at all.
+      syncSources: parseSyncSources(env['NEXUS_SYNC_SOURCES']).isNotEmpty
+          ? parseSyncSources(env['NEXUS_SYNC_SOURCES'])
+          : appleSyncCandidates(
+              env['HOME'] ?? env['USERPROFILE'] ?? '',
+              os: Platform.operatingSystem,
+            ),
     );
   }
 
@@ -71,6 +83,9 @@ class ServerConfig {
 
   /// Security cameras declared via `NEXUS_CAMERAS` (see [parseCameras]).
   final List<Camera> cameras;
+
+  /// Folders pulled into Drive - see sync/folder_sync.dart.
+  final List<SyncSource> syncSources;
 
   File get pairingTokenFile => File('$dataDir/pairing_token');
   File get snapshotFile => File('$dataDir/state.json');

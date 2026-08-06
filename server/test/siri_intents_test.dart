@@ -100,7 +100,6 @@ void main() {
     });
 
     test('the noun in the phrase decides the kind', () {
-      final h = _harness();
       expect(kindsNamedIn('turn off the barn lights'), contains('light'));
       expect(kindsNamedIn('set the thermostat'), contains('climate'));
       // A door on a compound is often a gate, so asking for one keeps both.

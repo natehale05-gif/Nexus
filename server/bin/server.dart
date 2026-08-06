@@ -6,6 +6,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 import 'package:nexus_server/files/drive_store.dart';
+import 'package:nexus_server/sync/folder_sync.dart';
 import 'package:nexus_server/auth/auth_middleware.dart';
 import 'package:nexus_server/auth/pairing_token.dart';
 import 'package:nexus_server/config.dart';
@@ -59,8 +60,28 @@ Future<void> main(List<String> args) async {
   final wsHub = WebSocketHub(server, dispatcher, integrations.ollama, pairingToken);
   final drive = DriveStore(config.driveRoot);
   log('drive at ${config.driveRoot}', name: 'nexus.server');
-  final restApi =
-      RestApi(server, dispatcher, integrations.ollama, library, pairingToken, drive);
+  // Pulls iCloud Photos and iCloud Drive into Drive, one way. A photo taken
+  // on a phone reaches the Mac through iCloud on its own; NEXUS finds it
+  // there and copies it onto the compound's own disk.
+  final folderSync = FolderSync(
+    drive: drive,
+    sources: config.syncSources,
+    stateDir: config.dataDir,
+  );
+  for (final source in folderSync.availableSources) {
+    log('syncing ${source.label} from ${source.path}', name: 'nexus.server');
+  }
+  unawaited(folderSync.start());
+
+  final restApi = RestApi(
+    server,
+    dispatcher,
+    integrations.ollama,
+    library,
+    pairingToken,
+    drive,
+    folderSync,
+  );
   final ticker = SimulationTicker(server);
 
   Timer? saveTimer;

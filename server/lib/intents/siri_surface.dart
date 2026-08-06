@@ -167,6 +167,10 @@ List<SiriTarget> siriTargets(Compound compound) {
   ];
 }
 
+/// Exhaustive on purpose - no default case. Device is sealed, so adding a
+/// new kind of device stops compiling here until someone decides what Siri
+/// should call it, rather than silently landing in a bucket named "device"
+/// that no phrase will ever match.
 String _kindOf(Device device) => switch (device) {
       LightDevice() => 'light',
       LockDevice(isGate: true) => 'gate',
@@ -174,7 +178,6 @@ String _kindOf(Device device) => switch (device) {
       ClimateDevice() => 'climate',
       MediaDevice() => 'media',
       GrillDevice() => 'grill',
-      _ => 'device',
     };
 
 /// The kind a phrase is asking about, when it says so.

@@ -7,6 +7,7 @@ import 'package:shelf_router/shelf_router.dart';
 import '../auth/pairing_token.dart';
 import '../files/drive_store.dart';
 import '../intents/siri_runner.dart';
+import '../sync/folder_sync.dart';
 import '../intents/siri_surface.dart';
 import '../integrations/ollama_bridge.dart';
 import '../media/library_index.dart';
@@ -40,7 +41,8 @@ class RestApi {
     this.ollama,
     this.library,
     this.pairingToken,
-    this.drive, {
+    this.drive,
+    this.folderSync, {
     DiscoveryService? discovery,
   }) : discovery = discovery ?? DiscoveryService();
 
@@ -50,6 +52,7 @@ class RestApi {
   final LibraryIndex library;
   final PairingToken pairingToken;
   final DriveStore drive;
+  final FolderSync folderSync;
   final DiscoveryService discovery;
 
   Handler get handler {
@@ -135,6 +138,26 @@ class RestApi {
             'content-range': 'bytes $start-$end/$length',
             'content-length': '${end - start + 1}',
           });
+    });
+
+    // What NEXUS is pulling in from Apple's folders, and how it's going.
+    router.get('/sync/status', (Request request) {
+      return Response.ok(
+        jsonEncode({
+          'sources': [for (final s in folderSync.availableSources) s.toJson()],
+          'configured': [for (final s in folderSync.sources) s.toJson()],
+          'copiedLastPass': folderSync.copiedLastPass,
+          'skippedLastPass': folderSync.skippedLastPass,
+          'lastRun': folderSync.lastRun?.toIso8601String(),
+        }),
+        headers: _json,
+      );
+    });
+
+    // Pull now rather than waiting for the timer.
+    router.post('/sync/run', (Request request) async {
+      await folderSync.runOnce();
+      return Response.ok(jsonEncode({'copied': folderSync.copiedLastPass}), headers: _json);
     });
 
     // ---- Siri -------------------------------------------------------------

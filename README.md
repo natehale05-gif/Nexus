@@ -531,6 +531,55 @@ silently missing.
 The Home map remains the spatial view (where things are); Buildings is the
 working view (operating a building room by room).
 
+## Syncing from Apple
+
+Photos and files land on the compound's own disk automatically, including
+photos taken on a phone.
+
+The route is deliberately boring: a photo taken on the phone reaches iCloud
+Photos, iCloud brings it down to the Mac, and NEXUS copies it from the folder
+iCloud already maintains. No app running on the phone, no background task to
+keep alive, no entitlements. If the server runs on a Mac with iCloud Photos
+and iCloud Drive switched on, it needs no configuration at all - it finds
+`~/Pictures/iCloud Photos`, `~/Library/Mobile Documents/com~apple~CloudDocs`,
+Desktop and Documents by itself. iCloud for Windows creates equivalents, and
+those are detected too. Anywhere else, name the folders yourself:
+
+    NEXUS_SYNC_SOURCES="Photos=/Users/me/Pictures/iCloud Photos,Docs=/Users/me/Documents"
+
+**One way, additive, always.** NEXUS copies *from* iCloud and never writes
+back, never deletes, never moves. A sync that can delete is a sync that can
+lose your photos to a bug, and putting them on your own hardware is supposed
+to stop that being possible.
+
+The rules that matter, all tested in `server/test/folder_sync_test.dart`:
+
+- **iCloud placeholders are skipped.** A file the Mac hasn't downloaded yet is
+  a tiny `.icloud` stub, not the photo. Copying those produces a Drive full of
+  things that look like photos and aren't - so anything zero-byte, dot-
+  prefixed or `.icloud` is left for a later pass.
+- **Photo library packages aren't walked into.** `Photos Library.photoslibrary`
+  is thousands of internal files laid out for Photos, not for a person.
+- **Files younger than 30 seconds are left alone**, because a file still being
+  written has a size that changes underneath you, and half a photo recorded as
+  done never gets fixed.
+- **Nothing is copied twice.** A manifest keyed on source path, size and
+  modification time, so an untouched library costs nothing every five minutes
+  but an edited original does come through again.
+
+### What this can't do, and why
+
+**There is no way for an app to read your whole iCloud Drive from iOS.** Apple
+doesn't expose one - a third-party app can reach files a person explicitly
+picks, and its own container, and that's it. So the Files half genuinely
+depends on a Mac (or a Windows box with iCloud) having the folder locally.
+That's a platform limit, not something left unbuilt.
+
+**Photos taken on the phone reach the server as fast as iCloud syncs them**,
+not instantly. A phone-side uploader using PhotoKit would be quicker and would
+work with no Mac in the picture; it needs the iOS app installed, photo library
+permission and a background task, and it isn't built here.
+
 ## Siri
 
 Siri gets the compound - the lights, locks, gates, thermostats, the media
